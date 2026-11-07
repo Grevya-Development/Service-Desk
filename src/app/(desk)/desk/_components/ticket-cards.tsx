@@ -4,11 +4,36 @@ import { Avatar, Badge, Card, CardBody, CardHeader } from "@/components/ui";
 import { SlaBadge, TicketStatusBadge } from "@/components/tickets/badges";
 import { APPROVAL_META, ASSET_STATUSES, type CatalogField, ticketRef } from "@/lib/constants";
 import { formatDuration, formatTarget, type SlaState } from "@/lib/sla";
-import { formatDate, formatDateTime, humanize } from "@/lib/utils";
+import { cn, formatDate, formatDateTime, humanize } from "@/lib/utils";
 import type { ApprovalView, Person } from "@/lib/tickets/load";
 
+/**
+ * True when a catalog request's description is just its answers written out
+ * (what the catalog stores when the requester adds no note), so the agent
+ * view can show the answers table once instead of twice.
+ */
+export function isGeneratedDescription(description: string, fields: unknown, data: unknown) {
+  if (!data || typeof data !== "object") return false;
+  const labels = (Array.isArray(fields) ? fields : [])
+    .map((f) => (f && typeof f === "object" ? String((f as CatalogField).label ?? "") : ""))
+    .filter(Boolean)
+    .map((l) => l.toLowerCase());
+  const keys = Object.keys(data as Record<string, unknown>).map((k) => humanize(k).toLowerCase());
+  const known = [...labels, ...keys];
+  const lines = description.split("\n").map((l) => l.trim()).filter(Boolean);
+  if (!lines.length) return true;
+  if (lines.length === 1 && /^requested “.+” from the service catalog\.$/i.test(lines[0])) return true;
+  return lines.every((l) => {
+    const m = /^(?:[-*]\s*)?\*\*(.+?)\*\*/.exec(l);
+    if (!m) return false;
+    const norm = (v: string) => v.replace(/[:?\s]+$/, "").trim().toLowerCase();
+    const label = norm(m[1]);
+    return known.some((k) => norm(k) === label);
+  });
+}
+
 /** Catalog request answers, labelled with the catalog item's field definitions. */
-export function FormAnswers({ fields, data }: { fields: unknown; data: unknown }) {
+export function FormAnswers({ fields, data, first = false }: { fields: unknown; data: unknown; first?: boolean }) {
   if (!data || typeof data !== "object" || Array.isArray(data)) return null;
   const values = data as Record<string, unknown>;
   const defs = (Array.isArray(fields) ? fields : []).filter((f): f is CatalogField => !!f && typeof f === "object" && typeof (f as CatalogField).key === "string");
@@ -31,7 +56,7 @@ export function FormAnswers({ fields, data }: { fields: unknown; data: unknown }
   };
 
   return (
-    <div className="mt-4 rounded-lg border border-slate-200 bg-slate-50/60">
+    <div className={cn("rounded-lg border border-slate-200 bg-slate-50/60", !first && "mt-4")}>
       <p className="border-b border-slate-200 px-3 py-2 text-xs font-semibold uppercase tracking-wide text-slate-500">Request details</p>
       <dl className="divide-y divide-slate-100">
         {rows.map((r) => (

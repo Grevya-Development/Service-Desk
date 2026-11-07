@@ -1,15 +1,15 @@
 import { notFound } from "next/navigation";
-import { Boxes, Crown, Settings2, Shuffle, UserMinus, UserPlus, Users } from "lucide-react";
+import { Boxes, Coffee, Crown, Settings2, Shuffle, UserMinus, UserPlus, Users } from "lucide-react";
 import { requireLead } from "@/lib/auth";
 import { createClient } from "@/lib/supabase/server";
 import { OPEN_STATUSES } from "@/lib/constants";
-import { formatDate } from "@/lib/utils";
+import { formatDate, orgToday } from "@/lib/utils";
 import { Avatar, Badge, Button, Card, CardBody, CardHeader, EmptyState, PageHeader, Table, TBody, TD, TH, THead, TR } from "@/components/ui";
 import { ActionButton } from "@/components/ui/action-button";
 import { Dialog } from "@/components/ui/dialog";
 import { NamedIcon, TEAM_ICONS } from "../../_lib/icons";
 import { isUuid } from "../../_lib/validate";
-import { removeMember, setMemberRole } from "../actions";
+import { removeMember, setAgentAvailability, setMemberRole } from "../actions";
 import { AddMemberForm } from "../_components/add-member-form";
 import { TeamForm } from "../_components/team-form";
 
@@ -39,6 +39,15 @@ export default async function AdminTeamPage({ params }: { params: Promise<{ id: 
     supabase.from("tickets").select("assignee_id").eq("team_id", id).in("status", OPEN_STATUSES).not("assignee_id", "is", null).limit(5000),
   ]);
   if (!team) notFound();
+
+  // Availability (same rule as the database's is_away(): away, and no end date or it hasn't passed).
+  const today = orgToday();
+  const { data: profiles } = memberRows?.length
+    ? await supabase.from("agent_profiles").select("employee_id, away, away_until").in("employee_id", memberRows.map((m) => m.employee_id))
+    : { data: [] };
+  const awayUntil = new Map<string, string | null>();
+  for (const p of profiles ?? []) if (p.away && (!p.away_until || p.away_until >= today)) awayUntil.set(p.employee_id, p.away_until);
+  const awayCount = awayUntil.size;
 
   const members = ((memberRows ?? []) as Member[]).sort((a, b) => (a.role === b.role ? 0 : a.role === "lead" ? -1 : 1));
   const memberIds = new Set(members.map((m) => m.employee_id));
@@ -93,16 +102,20 @@ export default async function AdminTeamPage({ params }: { params: Promise<{ id: 
 
       <div className="grid grid-cols-1 gap-5 xl:grid-cols-[1fr_320px]">
         <Card className="overflow-hidden">
-          <CardHeader title="Members" description={`${members.length} ${members.length === 1 ? "person" : "people"} · ${leadCount} ${leadCount === 1 ? "lead" : "leads"}`} />
+          <CardHeader
+            title="Members"
+            description={`${members.length} ${members.length === 1 ? "person" : "people"} · ${leadCount} ${leadCount === 1 ? "lead" : "leads"}${awayCount ? ` · ${awayCount} away` : ""}`}
+          />
           {members.length === 0 ? (
             <EmptyState icon={Users} title="No one is on this team yet" description="Add agents so they can pick up this team's tickets." />
           ) : (
-            <Table>
+            <Table className="relative">
               <THead>
                 <TR>
                   <TH>Name</TH>
                   <TH className="hidden md:table-cell">Department</TH>
                   <TH>Role</TH>
+                  <TH>Availability</TH>
                   <TH className="text-right">Open tickets</TH>
                   <TH className="hidden sm:table-cell">Joined team</TH>
                   <TH className="text-right">
@@ -118,6 +131,8 @@ export default async function AdminTeamPage({ params }: { params: Promise<{ id: 
                   const lockLast = lastLead && !me.isAdmin;
                   const name = p?.full_name ?? p?.email ?? "Unknown";
                   const open = openByAgent.get(m.employee_id) ?? 0;
+                  const away = awayUntil.has(m.employee_id);
+                  const until = awayUntil.get(m.employee_id);
                   return (
                     <TR key={m.employee_id}>
                       <TD>
@@ -143,6 +158,29 @@ export default async function AdminTeamPage({ params }: { params: Promise<{ id: 
                         ) : (
                           <Badge tone="blue">Agent</Badge>
                         )}
+                      </TD>
+                      <TD>
+                        <div className="flex flex-wrap items-center gap-1.5">
+                          {away ? (
+                            <Badge tone="yellow" className="gap-1">
+                              <Coffee className="h-3 w-3" aria-hidden />
+                              Away{until ? ` until ${formatDate(until)}` : ""}
+                            </Badge>
+                          ) : (
+                            <Badge tone="green">Available</Badge>
+                          )}
+                          {me.isAdmin && (
+                            <ActionButton
+                              action={setAgentAvailability}
+                              fields={{ team_id: team.id, employee_id: m.employee_id, away: !away }}
+                              variant="ghost"
+                              className="h-7 px-2 text-xs"
+                              title={away ? `Mark ${name} as available` : `Mark ${name} as away`}
+                            >
+                              {away ? "Set available" : "Set away"}
+                            </ActionButton>
+                          )}
+                        </div>
                       </TD>
                       <TD className="text-right tabular-nums">{open}</TD>
                       <TD className="hidden whitespace-nowrap sm:table-cell">{formatDate(m.created_at)}</TD>
@@ -192,8 +230,22 @@ export default async function AdminTeamPage({ params }: { params: Promise<{ id: 
                   <p className="font-medium text-slate-800">Auto-assign is {team.auto_assign ? "on" : "off"}</p>
                   <p className="mt-0.5 text-xs leading-relaxed text-slate-500">
                     {team.auto_assign
-                      ? "Each new ticket is handed to the team member with the fewest open tickets. If two people are tied, the one who joined the team first gets it. Requests that need approval are handed out once approved."
+                      ? "Each new ticket is handed to the available team member with the fewest open tickets. If two people are tied, the one who joined the team first gets it. Requests that need approval are handed out once approved."
                       : "New tickets wait in the team's Unassigned queue until an agent picks one up or a lead assigns it. Leads are told about new urgent and high-priority tickets."}
+                  </p>
+                </div>
+              </div>
+              <div className="flex gap-3">
+                <span className="mt-0.5 flex h-8 w-8 shrink-0 items-center justify-center rounded-lg bg-amber-50 text-amber-700">
+                  <Coffee className="h-4 w-4" />
+                </span>
+                <div>
+                  <p className="font-medium text-slate-800">Away agents</p>
+                  <p className="mt-0.5 text-xs leading-relaxed text-slate-500">
+                    {team.auto_assign ? "Auto-assign skips anyone marked Away. " : "If you turn on auto-assign, it skips anyone marked Away. "}
+                    {me.isAdmin
+                      ? "Agents set this from their own menu; as a desk admin you can also change it here."
+                      : "Agents set this from their own menu (or ask a desk admin). Their tickets stay assigned while they're away."}
                   </p>
                 </div>
               </div>

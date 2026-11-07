@@ -1,4 +1,5 @@
 import type { Metadata } from "next";
+import { Suspense } from "react";
 import Link from "next/link";
 import {
   ArrowRight,
@@ -22,6 +23,7 @@ import { OPEN_STATUSES, ticketRef } from "@/lib/constants";
 import { formatDateTime, formatNumber, greeting } from "@/lib/utils";
 import { TeamChip } from "../requests/_components/team-chip";
 import { param, requestNow, timeAgo } from "../requests/_lib/query";
+import { IncidentBanner } from "../_components/incident-banner";
 
 export const metadata: Metadata = { title: "Home" };
 
@@ -73,6 +75,10 @@ export default async function HomePage({ searchParams }: { searchParams: Promise
           That page is only for support agents or team leads, so we brought you here instead.
         </div>
       )}
+
+      <Suspense fallback={null}>
+        <IncidentBanner />
+      </Suspense>
 
       {/* Hero */}
       <section className="relative overflow-hidden rounded-2xl bg-gradient-to-br from-navy-900 via-navy-800 to-primary-600 px-5 py-8 text-white shadow-sm sm:px-10 sm:py-10">
@@ -156,7 +162,7 @@ export default async function HomePage({ searchParams }: { searchParams: Promise
 
       <div className="grid gap-6 lg:grid-cols-3">
         {/* Your open requests */}
-        <Card className="lg:col-span-2">
+        <Card className="min-w-0 lg:col-span-2">
           <CardHeader
             title="Your open requests"
             description={openCount ? `${openCount} open` : undefined}
@@ -201,7 +207,7 @@ export default async function HomePage({ searchParams }: { searchParams: Promise
           )}
         </Card>
 
-        <div className="space-y-6">
+        <div className="min-w-0 space-y-6">
           {/* Agent shortcut */}
           {me.isAgent && (
             <Card className="overflow-hidden">

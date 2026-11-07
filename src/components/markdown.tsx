@@ -138,7 +138,12 @@ export function excerpt(source: string | null | undefined, max = 160) {
   const text = (source ?? "")
     .replace(/```[\s\S]*?```/g, " ")
     .replace(/\[([^\]]+)\]\([^)]+\)/g, "$1")
-    .replace(/[#>*`_-]/g, " ")
+    .split("\n")
+    .map((line) => line.replace(/^\s{0,3}(#{1,6}\s+|>\s?|[-*]\s+|\d+[.)]\s+)/, ""))
+    .join(" ")
+    .replace(/\*\*([^*]+)\*\*/g, "$1")
+    .replace(/\*([^*\s][^*]*)\*/g, "$1")
+    .replace(/`([^`]+)`/g, "$1")
     .replace(/\s+/g, " ")
     .trim();
   return text.length > max ? `${text.slice(0, max - 1)}…` : text;

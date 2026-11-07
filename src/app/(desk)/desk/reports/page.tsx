@@ -1,12 +1,13 @@
 import Link from "next/link";
-import { AlertTriangle, BarChart3, CheckCircle2, Clock, Inbox, MessageSquareReply, Smile, Timer, TrendingUp, Users } from "lucide-react";
+import { AlertTriangle, BarChart3, CheckCircle2, Clock, Download, Inbox, MessageSquareReply, Siren, Smile, Timer, TrendingUp, Users } from "lucide-react";
 import { requireAgent } from "@/lib/auth";
 import { createClient } from "@/lib/supabase/server";
 import { PRIORITIES, PRIORITY_META } from "@/lib/constants";
 import { formatDuration } from "@/lib/sla";
 import { cn, formatDate, orgToday } from "@/lib/utils";
 import { Avatar, Card, CardBody, CardHeader, EmptyState, Input, PageHeader, ProgressBar, Select, StatCard, Table, TBody, TD, TH, THead, TR, buttonClass } from "@/components/ui";
-import { RANGE_PRESETS, agentWorkload, backlogAgeBuckets, buildKpis, countBy, countInOrder, dailySeries, type Rate } from "@/lib/reports/aggregate";
+import { RANGE_PRESETS, agentWorkload, backlogAgeBuckets, buildKpis, countBy, countInOrder, dailySeries, incidentSummary, rangeBounds, type Rate, type ReportIncident } from "@/lib/reports/aggregate";
+import { EXPORT_ROW_CAP } from "@/lib/reports/export";
 import { ROW_CAP, loadPeopleNames, loadReportLookups, loadReportTickets, parseRange } from "./_lib/load";
 import { pctText, shortDay } from "./_lib/format";
 import { ChartCard } from "./_components/chart-card";
@@ -56,11 +57,30 @@ export default async function ReportsPage({ searchParams }: { searchParams: Prom
     return `/desk/reports?${sp.toString()}`;
   };
 
+  const exportQs = new URLSearchParams(team ? { team: team.id } : {});
+  if (range.preset) exportQs.set("range", range.preset);
+  else {
+    exportQs.set("from", range.from);
+    exportQs.set("to", range.to);
+  }
+
   const header = (
     <PageHeader
       title="Reports"
       description={`${team ? team.name : teams.length > 1 ? "All your teams" : (teams[0]?.name ?? "Your teams")} · ${formatDate(range.from)} to ${formatDate(range.to)}`}
       breadcrumbs={[{ label: "Agent workspace", href: "/desk" }, { label: "Reports" }]}
+      actions={
+        teams.length > 0 && (
+          <a
+            href={`/desk/reports/export?${exportQs.toString()}`}
+            download
+            className={buttonClass("outline")}
+            title={`Tickets raised in this period (up to ${EXPORT_ROW_CAP.toLocaleString("en-IN")}), as a spreadsheet`}
+          >
+            <Download className="h-4 w-4" aria-hidden /> Export tickets (CSV)
+          </a>
+        )
+      }
     />
   );
 
@@ -75,7 +95,13 @@ export default async function ReportsPage({ searchParams }: { searchParams: Prom
     );
   }
 
-  const [data, lookups] = await Promise.all([loadReportTickets(supabase, teamIds, range), loadReportLookups(supabase, teamIds)]);
+  const bounds = rangeBounds(range.from, range.to);
+  const [data, lookups, { data: incidentRows }] = await Promise.all([
+    loadReportTickets(supabase, teamIds, range),
+    loadReportLookups(supabase, teamIds),
+    supabase.from("incidents").select("id, started_at, resolved_at, status").in("team_id", teamIds).gte("started_at", bounds.start).lt("started_at", bounds.end).limit(1000),
+  ]);
+  const incidents = incidentSummary((incidentRows ?? []) as ReportIncident[], range.from, range.to);
   const now = new Date().getTime();
   const { kpis, created, resolved } = buildKpis({ tickets: data.tickets, open: data.open, from: range.from, to: range.to, now });
 
@@ -91,7 +117,7 @@ export default async function ReportsPage({ searchParams }: { searchParams: Prom
     workload.map((w) => w.agentId).filter((id) => !agentInfo.has(id)),
   );
   const unassignedOpen = data.open.filter((t) => !t.assignee_id).length;
-  const nothing = kpis.created === 0 && kpis.resolved === 0 && kpis.backlog === 0;
+  const nothing = kpis.created === 0 && kpis.resolved === 0 && kpis.backlog === 0 && incidents.declared === 0;
 
   return (
     <>
@@ -246,67 +272,98 @@ export default async function ReportsPage({ searchParams }: { searchParams: Prom
             </Card>
           </div>
 
-          <Card>
-            <CardHeader title="Agent workload" description="Open tickets each agent holds now, and what they resolved in this period." />
-            {workload.length === 0 ? (
-              <EmptyState icon={Users} title="No agents on this team yet" className="py-8" />
-            ) : (
-              <Table>
-                <caption className="sr-only">Agent workload</caption>
-                <THead>
-                  <TR className="hover:bg-transparent">
-                    <TH scope="col">Agent</TH>
-                    <TH scope="col" className="text-right">
-                      Open now
-                    </TH>
-                    <TH scope="col" className="text-right">
-                      Resolved
-                    </TH>
-                    <TH scope="col" className="text-right">
-                      Happy requesters
-                    </TH>
-                    <TH scope="col" className="text-right">
-                      Resolved on time
-                    </TH>
-                  </TR>
-                </THead>
-                <TBody>
-                  {workload.map((w) => {
-                    const info = agentInfo.get(w.agentId) ?? extraNames.get(w.agentId) ?? { name: "Former agent", avatarUrl: null };
-                    return (
-                      <TR key={w.agentId}>
-                        <TD className="min-w-44">
-                          <span className="flex items-center gap-2">
-                            <Avatar name={info.name} src={info.avatarUrl} size="xs" />
-                            <span className="truncate text-slate-800">{info.name}</span>
-                          </span>
-                        </TD>
-                        <TD className="text-right tabular-nums">{w.openAssigned}</TD>
-                        <TD className="text-right tabular-nums">{w.resolvedInRange}</TD>
-                        <TD className="whitespace-nowrap text-right tabular-nums">
-                          {pctText(w.csat.pct)}
-                          {w.csat.rated > 0 && <span className="ml-1 text-xs text-slate-400">({w.csat.rated})</span>}
-                        </TD>
-                        <TD className="whitespace-nowrap text-right tabular-nums">
-                          {pctText(w.sla.pct)}
-                          {w.sla.total > 0 && <span className="ml-1 text-xs text-slate-400">({w.sla.met}/{w.sla.total})</span>}
-                        </TD>
-                      </TR>
-                    );
-                  })}
-                  {unassignedOpen > 0 && (
-                    <TR className="bg-slate-50/60">
-                      <TD className="text-slate-500 italic">Not assigned yet</TD>
-                      <TD className="text-right tabular-nums text-slate-700">{unassignedOpen}</TD>
-                      <TD className="text-right text-slate-400">—</TD>
-                      <TD className="text-right text-slate-400">—</TD>
-                      <TD className="text-right text-slate-400">—</TD>
+          <div className="grid grid-cols-1 gap-6 xl:grid-cols-3">
+            <Card className="xl:col-span-2">
+              <CardHeader title="Agent workload" description="Open tickets each agent holds now, and what they resolved in this period." />
+              {workload.length === 0 ? (
+                <EmptyState icon={Users} title="No agents on this team yet" className="py-8" />
+              ) : (
+                <Table className="relative">
+                  <caption className="sr-only">Agent workload</caption>
+                  <THead>
+                    <TR className="hover:bg-transparent">
+                      <TH scope="col">Agent</TH>
+                      <TH scope="col" className="text-right">
+                        Open now
+                      </TH>
+                      <TH scope="col" className="text-right">
+                        Resolved
+                      </TH>
+                      <TH scope="col" className="text-right">
+                        Happy requesters
+                      </TH>
+                      <TH scope="col" className="text-right">
+                        Resolved on time
+                      </TH>
                     </TR>
-                  )}
-                </TBody>
-              </Table>
-            )}
-          </Card>
+                  </THead>
+                  <TBody>
+                    {workload.map((w) => {
+                      const info = agentInfo.get(w.agentId) ?? extraNames.get(w.agentId) ?? { name: "Former agent", avatarUrl: null };
+                      return (
+                        <TR key={w.agentId}>
+                          <TD className="min-w-44">
+                            <span className="flex items-center gap-2">
+                              <Avatar name={info.name} src={info.avatarUrl} size="xs" />
+                              <span className="truncate text-slate-800">{info.name}</span>
+                            </span>
+                          </TD>
+                          <TD className="text-right tabular-nums">{w.openAssigned}</TD>
+                          <TD className="text-right tabular-nums">{w.resolvedInRange}</TD>
+                          <TD className="whitespace-nowrap text-right tabular-nums">
+                            {pctText(w.csat.pct)}
+                            {w.csat.rated > 0 && <span className="ml-1 text-xs text-slate-400">({w.csat.rated})</span>}
+                          </TD>
+                          <TD className="whitespace-nowrap text-right tabular-nums">
+                            {pctText(w.sla.pct)}
+                            {w.sla.total > 0 && <span className="ml-1 text-xs text-slate-400">({w.sla.met}/{w.sla.total})</span>}
+                          </TD>
+                        </TR>
+                      );
+                    })}
+                    {unassignedOpen > 0 && (
+                      <TR className="bg-slate-50/60">
+                        <TD className="text-slate-500 italic">Not assigned yet</TD>
+                        <TD className="text-right tabular-nums text-slate-700">{unassignedOpen}</TD>
+                        <TD className="text-right text-slate-400">—</TD>
+                        <TD className="text-right text-slate-400">—</TD>
+                        <TD className="text-right text-slate-400">—</TD>
+                      </TR>
+                    )}
+                  </TBody>
+                </Table>
+              )}
+            </Card>
+
+            <Card>
+              <CardHeader title="Incidents" description="Outages declared in this period (things that affect many people at once)." />
+              <CardBody>
+                {incidents.declared === 0 ? (
+                  <EmptyState icon={Siren} title="No incidents in this period" description="No outages were declared between these dates." className="py-6" />
+                ) : (
+                  <div className="space-y-4">
+                    <dl className="grid grid-cols-2 gap-3">
+                      <div className="rounded-lg bg-slate-50 p-3">
+                        <dt className="text-xs text-slate-500">Declared</dt>
+                        <dd className="mt-0.5 text-2xl font-semibold tabular-nums text-slate-900">{incidents.declared}</dd>
+                      </div>
+                      <div className="rounded-lg bg-slate-50 p-3">
+                        <dt className="text-xs text-slate-500">Typical time to resolve</dt>
+                        <dd className="mt-0.5 text-2xl font-semibold tabular-nums text-slate-900">{formatDuration(incidents.medianResolveMins)}</dd>
+                      </div>
+                    </dl>
+                    <p className="text-xs text-slate-500">
+                      {incidents.resolved} resolved{incidents.stillOpen ? `, ${incidents.stillOpen} still open` : ""}. Time to resolve is the median, clock time, from when each
+                      incident started.
+                    </p>
+                    <Link href="/desk/incidents" className={buttonClass("outline", "sm")}>
+                      <Siren className="h-3.5 w-3.5" aria-hidden /> Open incidents
+                    </Link>
+                  </div>
+                )}
+              </CardBody>
+            </Card>
+          </div>
         </div>
       )}
     </>

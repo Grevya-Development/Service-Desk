@@ -8,7 +8,7 @@ import { Card, CardBody, CardHeader, EmptyState, PageHeader } from "@/components
 import { PriorityDot } from "@/components/tickets/badges";
 import { pickTeam } from "../_lib/access";
 import { loadLeadTeams } from "../_lib/data";
-import { WEEKDAYS } from "../_lib/validate";
+import { WEEKDAYS, workingDayMinutes } from "../_lib/validate";
 import { TeamSwitcher } from "../_components/team-switcher";
 import { SlaForm, type SlaRow } from "./_components/sla-form";
 
@@ -63,6 +63,7 @@ export default async function AdminSlaPage({ searchParams }: { searchParams: Pro
   });
   const missing = ORDER.filter((p) => !byPriority.has(p));
   const hours = (hoursRow?.value ?? {}) as Hours;
+  const dayMins = workingDayMinutes(hours.start, hours.end);
 
   return (
     <>
@@ -76,12 +77,12 @@ export default async function AdminSlaPage({ searchParams }: { searchParams: Pro
             title={`${team.name} targets`}
             description={missing.length ? "Some priorities have no target yet; suggested defaults are filled in. Save to apply them." : "Change any value, then save."}
           />
-          <SlaForm key={team.id} teamId={team.id} rows={rows} />
+          <SlaForm key={`${team.id}-${dayMins}`} teamId={team.id} rows={rows} dayMins={dayMins} />
         </Card>
 
         <div className="space-y-5">
           <Card>
-            <CardHeader title="Current targets" description="What's saved right now." />
+            <CardHeader title="Current targets" description="What's saved right now, in working hours." />
             <CardBody className="p-0">
               <ul className="divide-y divide-slate-100">
                 {ORDER.map((p) => {
@@ -128,7 +129,7 @@ export default async function AdminSlaPage({ searchParams }: { searchParams: Pro
               <p className="flex gap-2">
                 <Timer className="mt-0.5 h-4 w-4 shrink-0 text-primary-600" />
                 <span>
-                  In this form, one business day = 9 working hours. <strong>First response</strong> is the first public reply from someone other than the requester.{" "}
+                  In this form, one business day = {formatTarget(dayMins)} of working time (one full working day). <strong>First response</strong> is the first public reply from someone other than the requester.{" "}
                   <strong>Resolve</strong> is when the ticket is marked resolved.
                 </span>
               </p>

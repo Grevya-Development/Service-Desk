@@ -19,9 +19,13 @@ import {
   rangeBounds,
   resolutionSlaRate,
   responseSlaRate,
+  incidentSummary,
+  resolutionSlaMet,
+  responseSlaMet,
   type ReportTicket,
 } from "@/lib/reports/aggregate";
 import { csvCell, toCsv } from "@/lib/reports/csv";
+import { EXPORT_HEADER, exportRow, istDateTime, type ExportTicket } from "@/lib/reports/export";
 
 let seq = 0;
 function ticket(over: Partial<ReportTicket> = {}): ReportTicket {
@@ -239,5 +243,111 @@ describe("CSV", () => {
   });
   it("joins rows with CRLF", () => {
     expect(toCsv(["Tag", "Name"], [["LT-1", "MacBook, 14in"]])).toBe('Tag,Name\r\nLT-1,"MacBook, 14in"\r\n');
+  });
+});
+
+describe("per-ticket SLA outcome", () => {
+  it("response: null without target or outcome, yes when replied in time, no when breached", () => {
+    expect(responseSlaMet(ticket())).toBeNull();
+    expect(responseSlaMet(ticket({ first_response_due: "2026-11-02T05:00:00Z" }))).toBeNull();
+    expect(responseSlaMet(ticket({ first_response_due: "2026-11-02T05:00:00Z", first_responded_at: "2026-11-02T04:30:00Z" }))).toBe(true);
+    expect(responseSlaMet(ticket({ first_response_due: "2026-11-02T05:00:00Z", first_responded_at: "2026-11-02T06:00:00Z" }))).toBe(false);
+    expect(responseSlaMet(ticket({ first_response_due: "2026-11-02T05:00:00Z", response_breached: true }))).toBe(false);
+  });
+  it("resolution: only for resolved tickets with a target", () => {
+    expect(resolutionSlaMet(ticket({ resolution_due: "2026-11-03T05:00:00Z" }))).toBeNull();
+    expect(resolutionSlaMet(ticket({ resolved_at: "2026-11-02T10:00:00Z" }))).toBeNull();
+    expect(resolutionSlaMet(ticket({ resolution_due: "2026-11-03T05:00:00Z", resolved_at: "2026-11-02T10:00:00Z" }))).toBe(true);
+    expect(resolutionSlaMet(ticket({ resolution_due: "2026-11-03T05:00:00Z", resolved_at: "2026-11-02T10:00:00Z", resolution_breached: true }))).toBe(false);
+  });
+  it("rates agree with the per-ticket outcome", () => {
+    const list = [
+      ticket({ first_response_due: "2026-11-02T05:00:00Z", first_responded_at: "2026-11-02T04:30:00Z" }),
+      ticket({ first_response_due: "2026-11-02T05:00:00Z", response_breached: true }),
+      ticket({ first_response_due: "2026-11-02T05:00:00Z" }),
+    ];
+    expect(responseSlaRate(list)).toEqual({ met: 1, total: 2, pct: 50 });
+  });
+});
+
+describe("incidentSummary", () => {
+  const inc = (id: string, started_at: string, resolved_at: string | null, status = resolved_at ? "resolved" : "investigating") => ({ id, started_at, resolved_at, status });
+  it("counts incidents started in the India-day range and the median time to resolve", () => {
+    const s = incidentSummary(
+      [
+        inc("a", "2026-11-02T04:00:00Z", "2026-11-02T05:00:00Z"), // 60m
+        inc("b", "2026-11-03T04:00:00Z", "2026-11-03T07:00:00Z"), // 180m
+        inc("c", "2026-11-04T04:00:00Z", null), // still open
+        inc("d", "2026-10-01T04:00:00Z", "2026-10-01T05:00:00Z"), // outside
+        inc("e", "2026-11-01T18:00:00Z", null), // 23:30 IST on 1 Nov: outside
+      ],
+      "2026-11-02",
+      "2026-11-07",
+    );
+    expect(s).toEqual({ declared: 3, resolved: 2, stillOpen: 1, medianResolveMins: 120 });
+  });
+  it("is empty-safe", () => {
+    expect(incidentSummary([], "2026-11-01", "2026-11-07")).toEqual({ declared: 0, resolved: 0, stillOpen: 0, medianResolveMins: null });
+  });
+});
+
+describe("ticket export", () => {
+  const base: ExportTicket = {
+    id: "x",
+    number: 1042,
+    subject: "=HYPERLINK(\"http://evil\")",
+    status: "resolved",
+    priority: "high",
+    created_at: "2026-11-02T04:00:00Z",
+    first_response_due: "2026-11-02T05:00:00Z",
+    first_responded_at: "2026-11-02T04:20:00Z",
+    response_breached: false,
+    resolution_due: "2026-11-02T12:00:00Z",
+    resolved_at: "2026-11-02T13:00:00Z",
+    resolution_breached: true,
+    csat_rating: "good",
+    team: { name: "IT Support" },
+    category: { name: "Hardware, misc" },
+    requester: { full_name: "Priya Nair", email: "priya@grevya.com" },
+    assignee: null,
+  };
+  it("formats India date-times", () => {
+    expect(istDateTime("2026-11-02T04:00:00Z")).toBe("2026-11-02 09:30");
+    expect(istDateTime("2026-11-02T20:00:00Z")).toBe("2026-11-03 01:30");
+    expect(istDateTime(null)).toBe("");
+    expect(istDateTime("nope")).toBe("");
+  });
+  it("builds a row matching the header", () => {
+    const row = exportRow(base);
+    expect(row).toHaveLength(EXPORT_HEADER.length);
+    expect(row).toEqual([
+      "SD-1042",
+      '=HYPERLINK("http://evil")',
+      "IT Support",
+      "Hardware, misc",
+      "High",
+      "Resolved",
+      "Priya Nair",
+      "",
+      "2026-11-02 09:30",
+      "2026-11-02 09:50",
+      "2026-11-02 18:30",
+      "Yes",
+      "No",
+      "Good",
+    ]);
+  });
+  it("escapes cells and neutralises formulas in the CSV", () => {
+    const csv = toCsv(EXPORT_HEADER, [exportRow({ ...base, subject: "-2+3", requester: { full_name: "@bob", email: null } })]);
+    const line = csv.split("\r\n")[1];
+    expect(line.startsWith("SD-1042,'-2+3,IT Support,\"Hardware, misc\",High,Resolved,'@bob,")).toBe(true);
+    expect(toCsv(["a"], [[exportRow(base)[1]]])).toBe('a\r\n"\'=HYPERLINK(""http://evil"")"\r\n');
+  });
+  it("falls back to the requester email and leaves unknown values readable", () => {
+    const row = exportRow({ ...base, requester: { full_name: null, email: "x@grevya.com" }, status: "weird", priority: "toString", csat_rating: null, resolved_at: null, first_responded_at: null });
+    expect(row[6]).toBe("x@grevya.com");
+    expect(row[5]).toBe("weird");
+    expect(row[4]).toBe("toString");
+    expect(row.slice(9)).toEqual(["", "", "", "", ""]); // no reply yet and not breached: not measured
   });
 });

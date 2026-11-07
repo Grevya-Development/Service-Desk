@@ -167,7 +167,7 @@ export default async function ManageArticlesPage({ searchParams }: { searchParam
             }
           />
         ) : (
-          <Table>
+          <Table className="relative">
             <THead>
               <TR className="hover:bg-transparent">
                 <TH>Title</TH>

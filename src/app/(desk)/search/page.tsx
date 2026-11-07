@@ -1,5 +1,6 @@
 import type { Metadata } from "next";
 import Link from "next/link";
+import { redirect } from "next/navigation";
 import { ArrowRight, BookOpen, ClipboardList, Search, SearchX, Ticket } from "lucide-react";
 import { requireViewer } from "@/lib/auth";
 import { createClient } from "@/lib/supabase/server";
@@ -67,6 +68,8 @@ export default async function SearchPage({ searchParams }: { searchParams: Promi
       supabase.from("teams").select("id, name, color"),
     ]);
     exact = (exactRes.data as unknown as Hit | null) ?? null;
+    // "SD-1042" (or "1042") that you can open: go straight there.
+    if (exact && param(sp.stay) !== "1") redirect(hrefFor(exact));
     mine = ((mineRes.data ?? []) as unknown as Hit[]).filter((t) => t.id !== exact?.id);
     team = ((teamRes.data ?? []) as unknown as Hit[]).filter((t) => t.id !== exact?.id);
     articles = (articleRes.data ?? []) as typeof articles;

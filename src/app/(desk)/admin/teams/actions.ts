@@ -165,3 +165,28 @@ export async function removeMember(_prev: ActionState, fd: FormData): Promise<Ac
   const lostAccess = !g.me.isAdmin && employeeId === g.me.id;
   return ok("Removed from the team", lostAccess ? afterLosingLead(g.me.leadTeamIds, teamId!, "/home") : undefined);
 }
+
+/**
+ * Desk admins can mark a team member available / away (the database lets only
+ * the agent themself or a desk admin change it). Auto-assign skips away agents.
+ */
+export async function setAgentAvailability(_prev: ActionState, fd: FormData): Promise<ActionState> {
+  const g = await guardAdmin();
+  if (g.error !== undefined) return fail(g.error);
+  const teamId = str(fd, "team_id");
+  const employeeId = str(fd, "employee_id");
+  if (!isUuid(teamId) || !isUuid(employeeId)) return fail("Pick a team member.");
+  const away = bool(fd, "away");
+
+  const supabase = await createClient();
+  const { data: member } = await supabase.from("team_members").select("employee_id").eq("team_id", teamId).eq("employee_id", employeeId).maybeSingle();
+  if (!member) return fail("That person is no longer on this team.");
+  const { data, error } = await supabase
+    .from("agent_profiles")
+    .upsert({ employee_id: employeeId, away, away_until: null, updated_at: new Date().toISOString() })
+    .select("employee_id");
+  if (error) return fail(dbError(error));
+  if (!data?.length) return fail("You don't have permission to change availability.");
+  revalidatePath("/", "layout");
+  return ok(away ? "Marked as away. Auto-assign will skip them." : "Marked as available. Auto-assign can pick them again.");
+}

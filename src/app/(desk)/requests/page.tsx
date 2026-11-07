@@ -1,7 +1,7 @@
 import type { Metadata } from "next";
 import Link from "next/link";
 import { redirect } from "next/navigation";
-import { ClipboardList, Plus, Search, SearchX } from "lucide-react";
+import { ClipboardList, Plus, Search, SearchX, Users } from "lucide-react";
 import { requireViewer } from "@/lib/auth";
 import { createClient } from "@/lib/supabase/server";
 import { Card, EmptyState, PageHeader, buttonClass } from "@/components/ui";
@@ -20,6 +20,7 @@ const TABS = {
   resolved: { label: "Resolved", statuses: ["resolved"] },
   closed: { label: "Closed", statuses: ["closed"] },
   all: { label: "All", statuses: null },
+  following: { label: "Following", statuses: null },
 } as const;
 type TabKey = keyof typeof TABS;
 const isTab = (v: string): v is TabKey => v in TABS;
@@ -40,8 +41,12 @@ export default async function MyRequestsPage({ searchParams }: { searchParams: P
   const supabase = await createClient();
 
   const SELECT = "id, number, subject, status, priority, approval_status, updated_at, team:teams(name, color), assignee:people!assignee_id(full_name)";
-  const filtered = (statuses: readonly string[] | null, head = false) => {
-    let q = supabase.from("tickets").select(head ? "id" : SELECT, { count: "exact", head }).eq("requester_id", me.id);
+  // "Following": requests other people raised and added me to (ticket_followers).
+  const FOLLOW_SELECT = `${SELECT}, requester:people!requester_id(full_name), ticket_followers!inner(employee_id)`;
+  const filtered = (statuses: readonly string[] | null, head = false, following = false) => {
+    let q = following
+      ? supabase.from("tickets").select(head ? "id, ticket_followers!inner(employee_id)" : FOLLOW_SELECT, { count: "exact", head }).eq("ticket_followers.employee_id", me.id)
+      : supabase.from("tickets").select(head ? "id" : SELECT, { count: "exact", head }).eq("requester_id", me.id);
     if (statuses) q = q.in("status", statuses as string[]);
     if (number && safe) q = q.or(`number.eq.${number},subject.ilike.%${safe}%`);
     else if (safe) q = q.ilike("subject", `%${safe}%`);
@@ -49,11 +54,12 @@ export default async function MyRequestsPage({ searchParams }: { searchParams: P
   };
 
   const from = (page - 1) * PAGE_SIZE;
-  const [list, openCount, resolvedCount, closedCount] = await Promise.all([
-    filtered(TABS[tab].statuses).order("updated_at", { ascending: false }).range(from, from + PAGE_SIZE - 1),
+  const [list, openCount, resolvedCount, closedCount, followingCount] = await Promise.all([
+    filtered(TABS[tab].statuses, false, tab === "following").order("updated_at", { ascending: false }).range(from, from + PAGE_SIZE - 1),
     filtered(TABS.open.statuses, true),
     filtered(TABS.resolved.statuses, true),
     filtered(TABS.closed.statuses, true),
+    filtered(null, true, true),
   ]);
 
   const items = (list.data ?? []) as unknown as RequestListItem[];
@@ -63,10 +69,14 @@ export default async function MyRequestsPage({ searchParams }: { searchParams: P
     resolved: resolvedCount.count ?? 0,
     closed: closedCount.count ?? 0,
     all: (openCount.count ?? 0) + (resolvedCount.count ?? 0) + (closedCount.count ?? 0),
+    following: followingCount.count ?? 0,
   };
 
   const qPart = rawQ ? `&q=${encodeURIComponent(rawQ)}` : "";
-  const tabs = (Object.keys(TABS) as TabKey[]).map((k) => ({ label: TABS[k].label, href: `/requests?tab=${k}${qPart}`, count: counts[k] }));
+  // Only show "Following" to people who follow something (or who just landed on it).
+  const tabs = (Object.keys(TABS) as TabKey[])
+    .filter((k) => k !== "following" || counts.following > 0 || tab === "following")
+    .map((k) => ({ label: TABS[k].label, href: `/requests?tab=${k}${qPart}`, count: counts[k] }));
   const now = requestNow();
 
   return (
@@ -99,7 +109,7 @@ export default async function MyRequestsPage({ searchParams }: { searchParams: P
               name="q"
               defaultValue={rawQ}
               placeholder="Search by subject or number (e.g. SD-1042)"
-              aria-label="Search your requests"
+              aria-label={tab === "following" ? "Search requests you follow" : "Search your requests"}
               className="h-9 w-full rounded-lg border border-slate-300 bg-white pl-9 pr-3 text-sm text-slate-800 placeholder:text-slate-400 shadow-sm focus:border-primary-500 focus:outline-none focus:ring-2 focus:ring-primary-500/20"
             />
           </div>
@@ -117,10 +127,10 @@ export default async function MyRequestsPage({ searchParams }: { searchParams: P
 
         {items.length > 0 ? (
           <>
-            <RequestList items={items} now={now} />
+            <RequestList items={items} now={now} showRequester={tab === "following"} />
             <Pager page={page} pageSize={PAGE_SIZE} total={total} noun="requests" hrefFor={(p) => `/requests?tab=${tab}${qPart}&page=${p}`} />
           </>
-        ) : rawQ ? (
+        ) : rawQ && tab !== "following" ? (
           <EmptyState
             icon={SearchX}
             title={`No requests match “${rawQ}”`}
@@ -141,14 +151,14 @@ export default async function MyRequestsPage({ searchParams }: { searchParams: P
             }
           />
         ) : (
-          <EmptyState icon={ClipboardList} {...emptyCopy(tab, counts.all)} />
+          <EmptyState icon={tab === "following" ? Users : ClipboardList} {...emptyCopy(tab, counts.all, rawQ)} />
         )}
       </Card>
     </div>
   );
 }
 
-function emptyCopy(tab: TabKey, all: number) {
+function emptyCopy(tab: TabKey, all: number, q: string) {
   const raise = (
     <div className="flex flex-wrap justify-center gap-2">
       <Link href="/requests/new" className={buttonClass("primary", "sm")}>
@@ -159,6 +169,14 @@ function emptyCopy(tab: TabKey, all: number) {
       </Link>
     </div>
   );
+  if (tab === "following") {
+    return q
+      ? { title: `No followed requests match “${q}”`, description: "Try different words or a request number." }
+      : {
+          title: "You're not following any requests",
+          description: "When a colleague adds you to one of their requests, it shows up here so you can keep track and reply.",
+        };
+  }
   if (all === 0) {
     return { title: "You haven't raised any requests yet", description: "When something isn't working, or you need something new, start here. You can follow progress on this page.", action: raise };
   }

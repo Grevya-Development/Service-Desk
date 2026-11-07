@@ -3,7 +3,7 @@ import type { HTMLAttributes, TdHTMLAttributes, ThHTMLAttributes } from "react";
 
 export function Table({ className, ...props }: HTMLAttributes<HTMLTableElement>) {
   return (
-    <div className="w-full overflow-x-auto thin-scroll">
+    <div className="relative w-full overflow-x-auto thin-scroll">
       <table className={cn("w-full text-left text-sm", className)} {...props} />
     </div>
   );

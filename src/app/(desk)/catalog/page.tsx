@@ -1,3 +1,4 @@
+import { Suspense } from "react";
 import Link from "next/link";
 import { MessageSquarePlus, ShoppingBag } from "lucide-react";
 import { requireViewer } from "@/lib/auth";
@@ -5,6 +6,7 @@ import { createClient } from "@/lib/supabase/server";
 import { Card, EmptyState, PageHeader, buttonClass } from "@/components/ui";
 import { CatalogBrowser, type CatalogTeam } from "./_components/catalog-browser";
 import type { CatalogCardItem } from "./_components/catalog-card";
+import { IncidentBanner } from "../_components/incident-banner";
 
 export const metadata = { title: "Service catalog" };
 
@@ -81,6 +83,9 @@ export default async function CatalogPage({ searchParams }: { searchParams: Prom
           </Link>
         }
       />
+      <Suspense fallback={null}>
+        <IncidentBanner className="mb-6" />
+      </Suspense>
 
       {items.length === 0 ? (
         <Card>

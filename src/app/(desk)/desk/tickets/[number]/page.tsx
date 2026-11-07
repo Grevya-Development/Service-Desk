@@ -1,5 +1,6 @@
 import { redirect } from "next/navigation";
-import { CheckCircle2, Hourglass, Laptop, MessageCircleQuestion, UserCheck } from "lucide-react";
+import Link from "next/link";
+import { CheckCircle2, GitMerge, Hourglass, Laptop, MessageCircleQuestion, UserCheck } from "lucide-react";
 import { requireAgent } from "@/lib/auth";
 import { createClient } from "@/lib/supabase/server";
 import { loadTicket } from "@/lib/tickets/load";
@@ -12,10 +13,11 @@ import { Markdown } from "@/components/markdown";
 import { ticketRef } from "@/lib/constants";
 import { slaStates } from "@/lib/sla";
 import { formatDateTime, humanize } from "@/lib/utils";
-import { assignToMe, markPending, resolveTicket } from "../../actions";
+import { assignToMe, markPending, recordTemplateUse, resolveTicket } from "../../actions";
 import { PropertiesForm } from "../../_components/properties-form";
 import { TeamChip } from "../../_components/team-chip";
-import { ApprovalsCard, FormAnswers, RequesterCard, SlaCard, approverName } from "../../_components/ticket-cards";
+import { ApprovalsCard, FormAnswers, RequesterCard, SlaCard, approverName, isGeneratedDescription } from "../../_components/ticket-cards";
+import { FollowersCard, IncidentCard, MergeDialog, TicketHotkeys } from "../../_components/ticket-extras";
 
 type Props = { params: Promise<{ number: string }> };
 
@@ -32,7 +34,7 @@ export default async function AgentTicketPage({ params }: Props) {
 
   const supabase = await createClient();
   const requester = ticket.requester;
-  const [teamsRes, categoriesRes, membersRes, policyRes, managerRes, otherRes, assetsRes] = await Promise.all([
+  const [teamsRes, categoriesRes, membersRes, policyRes, managerRes, otherRes, assetsRes, cannedRes, firstNameRes, followersRes, incidentsRes, mergedIntoRes, mergedHereRes, adminsRes] = await Promise.all([
     supabase.from("teams").select("id, name, color, active, manages_assets").order("sort_order"),
     supabase.from("categories").select("id, name, team_id, active").order("sort_order").order("name"),
     supabase.from("team_members").select("team_id, person:people!employee_id(id, full_name, status)"),
@@ -49,6 +51,17 @@ export default async function AgentTicketPage({ params }: Props) {
     me.managesAssets
       ? supabase.from("assets").select("id, asset_tag, name, status").eq("assigned_to", ticket.requester_id).order("asset_tag")
       : Promise.resolve({ data: null }),
+    supabase.from("canned_responses").select("id, title, body").eq("team_id", ticket.team_id).order("use_count", { ascending: false }).order("title").limit(200),
+    supabase.from("people").select("first_name").eq("id", ticket.requester_id).maybeSingle(),
+    supabase.from("ticket_followers").select("created_at, person:people!employee_id(id, full_name, email, avatar_url)").eq("ticket_id", ticket.id).order("created_at"),
+    supabase
+      .from("incidents")
+      .select("id, title, status, severity")
+      .or(ticket.incident_id ? `and(team_id.eq.${ticket.team_id},status.neq.resolved),id.eq.${ticket.incident_id}` : `and(team_id.eq.${ticket.team_id},status.neq.resolved)`)
+      .order("started_at", { ascending: false }),
+    ticket.merged_into ? supabase.from("tickets").select("number, subject").eq("id", ticket.merged_into).maybeSingle() : Promise.resolve({ data: null }),
+    supabase.from("tickets").select("id, number").eq("merged_into", ticket.id).order("number"),
+    supabase.from("people").select("id").eq("role", "super_admin"),
   ]);
 
   const teams = teamsRes.data ?? [];
@@ -80,6 +93,15 @@ export default async function AgentTicketPage({ params }: Props) {
       ]
     : null;
 
+  const incidents = incidentsRes.data ?? [];
+  const linkedIncident = ticket.incident_id ? (incidents.find((i) => i.id === ticket.incident_id) ?? null) : null;
+  const activeIncidents = incidents.filter((i) => i.status !== "resolved");
+  const followers = (followersRes.data ?? []).map((f) => f.person as unknown as { id: string; full_name: string | null; email: string; avatar_url: string | null } | null).filter((p) => p !== null);
+  const supportIds = [...new Set([...agents.filter((a) => a.team_id === ticket.team_id).map((a) => a.id), ...(adminsRes.data ?? []).map((a) => a.id)])];
+  const mergedInto = mergedIntoRes.data;
+  const mergedHere = mergedHereRes.data ?? [];
+  const showDescription = !(ticket.form_data && isGeneratedDescription(ticket.description, ticket.catalog_item?.fields, ticket.form_data));
+
   const resolveBlocked = awaitingApproval ? "Waiting for approval" : done ? "Already resolved" : undefined;
   const pendingBlocked = awaitingApproval ? "Waiting for approval" : ticket.status === "new" || ticket.status === "open" ? undefined : `Can't do this while ${humanize(ticket.status).toLowerCase()}`;
 
@@ -90,11 +112,15 @@ export default async function AgentTicketPage({ params }: Props) {
         title={<span className="break-words">{ticket.subject}</span>}
         actions={
           <>
+            <TicketHotkeys />
             {isMember && ticket.assignee_id !== me.id && (
-              <ActionButton action={assignToMe} fields={{ ticket_id: ticket.id }} variant="outline">
-                <UserCheck className="h-3.5 w-3.5" /> Assign to me
-              </ActionButton>
+              <span data-shortcut="assign" className="contents">
+                <ActionButton action={assignToMe} fields={{ ticket_id: ticket.id }} variant="outline" title="Assign to me (a)">
+                  <UserCheck className="h-3.5 w-3.5" /> Assign to me
+                </ActionButton>
+              </span>
             )}
+            {!ticket.merged_into && <MergeDialog ticketId={ticket.id} ticketNumber={ticket.number} />}
             <ActionButton
               action={markPending}
               fields={{ ticket_id: ticket.id }}
@@ -107,6 +133,7 @@ export default async function AgentTicketPage({ params }: Props) {
             >
               <MessageCircleQuestion className="h-3.5 w-3.5" /> Mark pending
             </ActionButton>
+            <span data-shortcut="resolve" className="contents">
             <ActionButton
               action={resolveTicket}
               fields={{ ticket_id: ticket.id }}
@@ -115,13 +142,31 @@ export default async function AgentTicketPage({ params }: Props) {
               prompt="Resolution note (sent to the requester as a reply)"
               promptRequired
               disabled={Boolean(resolveBlocked)}
-              title={resolveBlocked}
+              title={resolveBlocked ?? "Resolve (Shift+E)"}
             >
               <CheckCircle2 className="h-3.5 w-3.5" /> Resolve
             </ActionButton>
+            </span>
           </>
         }
       />
+
+      {mergedInto !== null && ticket.merged_into && (
+        <div role="status" className="mb-5 flex items-start gap-3 rounded-xl border border-slate-200 bg-slate-50 px-4 py-3 text-sm text-slate-700">
+          <GitMerge className="mt-0.5 h-4 w-4 shrink-0 text-slate-500" />
+          <p>
+            This ticket was merged into{" "}
+            {mergedInto ? (
+              <Link href={`/desk/tickets/${mergedInto.number}`} className="font-medium text-primary-700 underline">
+                {ticketRef(mergedInto.number)} · {mergedInto.subject}
+              </Link>
+            ) : (
+              "another ticket"
+            )}
+            . Carry on the conversation there.
+          </p>
+        </div>
+      )}
 
       {awaitingApproval && (
         <div role="status" className="mb-5 flex items-start gap-3 rounded-xl border border-amber-200 bg-amber-50 px-4 py-3 text-sm text-amber-900">
@@ -133,7 +178,7 @@ export default async function AgentTicketPage({ params }: Props) {
         </div>
       )}
 
-      <div className="grid gap-5 lg:grid-cols-[minmax(0,1fr)_340px]">
+      <div className="grid grid-cols-1 gap-5 lg:grid-cols-[minmax(0,1fr)_340px]">
         <div className="min-w-0 space-y-5">
           <Card>
             <div className="h-1 rounded-t-xl" style={{ backgroundColor: ticket.team?.color ?? "#2d48c8" }} />
@@ -160,23 +205,48 @@ export default async function AgentTicketPage({ params }: Props) {
                 {ticket.creator && ticket.creator.id !== ticket.requester_id && <> by {ticket.creator.full_name ?? "an agent"} on behalf of {requester?.full_name ?? "the requester"}</>}
                 {ticket.legacy_ref && <> · Imported from {ticket.legacy_ref}</>}
               </p>
+              {mergedHere.length > 0 && (
+                <p className="text-xs text-slate-500">
+                  Merged here:{" "}
+                  {mergedHere.map((m, i) => (
+                    <span key={m.id}>
+                      {i > 0 && ", "}
+                      <Link href={`/desk/tickets/${m.number}`} className="font-mono font-medium text-primary-600 hover:underline">
+                        {ticketRef(m.number)}
+                      </Link>
+                    </span>
+                  ))}
+                </p>
+              )}
             </CardBody>
           </Card>
 
           <Card>
-            <CardHeader title="Description" />
+            <CardHeader title={showDescription ? "Description" : "Request"} />
             <CardBody>
-              <Markdown source={ticket.description} className="prose-doc break-words text-sm text-slate-700" />
+              {showDescription && <Markdown source={ticket.description} className="prose-doc break-words text-sm text-slate-700" />}
+              {ticket.form_data && <FormAnswers fields={ticket.catalog_item?.fields} data={ticket.form_data} first={!showDescription} />}
               <AttachmentList files={ticketAttachments} className="mt-3" />
-              {ticket.form_data && <FormAnswers fields={ticket.catalog_item?.fields} data={ticket.form_data} />}
             </CardBody>
           </Card>
 
           <Card>
             <CardHeader title="Conversation" description="Replies go to the requester. Internal notes are visible to agents only." />
             <CardBody className="space-y-5">
-              <Conversation items={timeline} requesterId={ticket.requester_id} audience="agent" />
-              <Composer ticketId={ticket.id} canNote />
+              <Conversation items={timeline} requesterId={ticket.requester_id} audience="agent" agentIds={supportIds} />
+              {ticket.merged_into ? (
+                <p className="rounded-lg bg-slate-50 px-3 py-2 text-xs text-slate-500">Replies are off because this ticket was merged.</p>
+              ) : (
+                <Composer
+                  ticketId={ticket.id}
+                  canNote
+                  hotkeys
+                  articles
+                  templates={cannedRes.data ?? []}
+                  placeholders={{ first_name: firstNameRes.data?.first_name ?? requester?.full_name?.split(" ")[0] ?? "there", ticket: ticketRef(ticket.number), agent_name: me.name }}
+                  onTemplateUse={recordTemplateUse}
+                />
+              )}
             </CardBody>
           </Card>
         </div>
@@ -213,6 +283,10 @@ export default async function AgentTicketPage({ params }: Props) {
             assets={requesterAssets}
             linkAssets={me.managesAssets}
           />
+
+          <FollowersCard ticketId={ticket.id} followers={followers} requesterId={ticket.requester_id} canEdit={!ticket.merged_into} />
+
+          {(linkedIncident || activeIncidents.length > 0) && <IncidentCard ticketId={ticket.id} linked={linkedIncident} active={activeIncidents} />}
 
           <SlaCard
             response={sla.response}

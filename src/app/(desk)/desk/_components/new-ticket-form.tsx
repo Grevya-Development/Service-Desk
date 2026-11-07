@@ -1,10 +1,13 @@
 "use client";
 
 import { useMemo, useState } from "react";
-import { Paperclip, Send } from "lucide-react";
+import { Paperclip, Send, Upload } from "lucide-react";
 import { ActionForm, SubmitButton } from "@/components/ui/action-form";
 import { Checkbox, Field, FormGrid, Input, Select, Textarea } from "@/components/ui/form";
 import { MAX_ATTACHMENTS, PRIORITIES, PRIORITY_META } from "@/lib/constants";
+import { FileChips, useFileAttachments } from "@/components/tickets/attachments";
+import { formatBytes } from "@/components/tickets/format";
+import { cn } from "@/lib/utils";
 import { createTicket } from "../actions";
 
 type Employee = { id: string; full_name: string | null; email: string; department: string | null; designation: string | null };
@@ -31,7 +34,7 @@ export function NewTicketForm({
   const [requesterId, setRequesterId] = useState("");
   const [teamId, setTeamId] = useState(teams[0]?.id ?? "");
   const [assignToMe, setAssignToMe] = useState(memberTeamIds.includes(teams[0]?.id ?? ""));
-  const [fileCount, setFileCount] = useState(0);
+  const attach = useFileAttachments();
 
   const shown = useMemo(() => {
     const q = filter.trim().toLowerCase();
@@ -131,7 +134,7 @@ export function NewTicketForm({
         <Input id="nt-subject" name="subject" required minLength={3} maxLength={200} placeholder="e.g. Laptop won't connect to office Wi-Fi" />
       </Field>
       <Field label="Description" htmlFor="nt-description" required hint="Markdown supported: **bold**, lists and links.">
-        <Textarea id="nt-description" name="description" required rows={6} maxLength={20000} placeholder="What happened, when it started, and anything already tried." />
+        <Textarea id="nt-description" name="description" required rows={6} onPaste={attach.onPaste} maxLength={20000} placeholder="What happened, when it started, and anything already tried." />
       </Field>
 
       <div className="rounded-lg border border-slate-200 bg-slate-50/60 p-3">
@@ -157,13 +160,26 @@ export function NewTicketForm({
         </div>
       </div>
 
-      <div>
-        <label className="inline-flex cursor-pointer items-center gap-1.5 rounded-lg border border-dashed border-slate-300 px-3 py-2 text-xs text-slate-600 hover:border-primary-500 hover:text-primary-600">
-          <Paperclip className="h-3.5 w-3.5" />
-          {fileCount ? `${fileCount} file${fileCount === 1 ? "" : "s"} attached` : "Attach files"}
-          <input type="file" name="files" multiple className="sr-only" onChange={(e) => setFileCount(e.target.files?.length ?? 0)} />
-        </label>
-        <p className="mt-1 text-[11px] text-slate-400">Up to {MAX_ATTACHMENTS} files, 4 MB in total.</p>
+      <div {...attach.dropProps} className={cn("rounded-lg border border-dashed border-slate-300 p-3 transition-colors", attach.dragging && "border-primary-500 bg-primary-50/60")}>
+        <div className="flex flex-wrap items-center gap-x-3 gap-y-1">
+          <label className="inline-flex cursor-pointer items-center gap-1.5 rounded-md px-2 py-1 text-xs font-medium text-slate-700 focus-within:ring-2 focus-within:ring-primary-500 hover:bg-slate-100">
+            <Paperclip className="h-3.5 w-3.5" />
+            {attach.files.length ? "Add more files" : "Attach files"}
+            <input {...attach.inputProps} />
+          </label>
+          <span className="text-[11px] text-slate-500">
+            {attach.dragging ? (
+              <span className="inline-flex items-center gap-1 font-medium text-primary-700">
+                <Upload className="h-3.5 w-3.5" /> Drop to attach
+              </span>
+            ) : attach.files.length ? (
+              `${attach.files.length} of ${MAX_ATTACHMENTS} files · ${formatBytes(attach.totalBytes)} of 4 MB`
+            ) : (
+              `Drop files here or paste a screenshot into the description. Up to ${MAX_ATTACHMENTS} files, 4 MB in total.`
+            )}
+          </span>
+        </div>
+        <FileChips files={attach.files} onRemove={attach.removeFile} className="mt-2 flex flex-wrap gap-1.5" />
       </div>
 
       <div className="flex justify-end border-t border-slate-100 pt-4">

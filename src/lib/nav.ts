@@ -26,7 +26,7 @@ export type NavSection = { title: string; items: NavItem[] };
 
 export type NavViewer = { isAgent: boolean; isLead: boolean; isAdmin: boolean; managesAssets: boolean; showApprovals: boolean };
 
-export function buildNav(v: NavViewer, counts: { approvals: number; unassigned: number; activeIncidents: number }): NavSection[] {
+export function buildNav(v: NavViewer, counts: { approvals: number; unassigned: number; activeIncidents: number; myTeamIncidents: number }): NavSection[] {
   const sections: NavSection[] = [
     {
       title: "Help center",
@@ -48,7 +48,7 @@ export function buildNav(v: NavViewer, counts: { approvals: number; unassigned: 
       items: [
         { label: "Ticket queue", href: "/desk", icon: "queue", badge: counts.unassigned, exact: true },
         { label: "New ticket", href: "/desk/new", icon: "ticket-plus" },
-        { label: "Incidents", href: "/desk/incidents", icon: "incidents", badge: counts.activeIncidents },
+        { label: "Incidents", href: "/desk/incidents", icon: "incidents", badge: counts.myTeamIncidents },
         { label: "Reply templates", href: "/desk/templates", icon: "templates" },
         { label: "Manage articles", href: "/desk/kb", icon: "kb-edit" },
         ...(v.managesAssets ? [{ label: "Assets", href: "/desk/assets", icon: "assets" as const }] : []),

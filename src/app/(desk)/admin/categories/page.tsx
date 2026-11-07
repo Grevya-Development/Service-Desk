@@ -77,7 +77,7 @@ export default async function AdminCategoriesPage({ searchParams }: { searchPara
         {list.length === 0 ? (
           <EmptyState icon={FolderTree} title="No categories yet" description="Add a few categories, plus an “Other” for everything else." />
         ) : (
-          <Table>
+          <Table className="relative">
             <THead>
               <TR>
                 <TH className="w-24">Order</TH>

@@ -1,12 +1,12 @@
-import { Clock, Database, Download, Gauge, Link2, TimerReset } from "lucide-react";
+import { BellRing, Clock, Database, Download, Gauge, Link2, TimerReset } from "lucide-react";
 import { requireAdmin } from "@/lib/auth";
 import { createClient } from "@/lib/supabase/server";
 import { formatDateTime } from "@/lib/utils";
 import { Card, CardBody, CardHeader, Field, Input, PageHeader, Select } from "@/components/ui";
 import { ActionForm, SubmitButton } from "@/components/ui/action-form";
 import { ActionButton } from "@/components/ui/action-button";
-import { TIMEZONES, WEEKDAYS } from "../_lib/validate";
-import { importHrHelpdesk, runSlaChecksNow, saveAppUrl, saveAutoClose, saveBusinessHours } from "./actions";
+import { PENDING_LIMITS, TIMEZONES, WEEKDAYS } from "../_lib/validate";
+import { importHrHelpdesk, runSlaChecksNow, saveAppUrl, saveAutoClose, saveBusinessHours, savePendingFollowUp } from "./actions";
 
 export const metadata = { title: "Settings" };
 
@@ -21,6 +21,12 @@ function readHours(v: unknown): Hours {
     end: typeof o.end === "string" ? o.end : DEFAULT_HOURS.end,
     timezone: typeof o.timezone === "string" ? o.timezone : DEFAULT_HOURS.timezone,
   };
+}
+
+/** A positive whole-number setting, or the fallback. */
+function intSetting(v: unknown, fallback: number) {
+  const n = Number(v);
+  return Number.isInteger(n) && n > 0 ? n : fallback;
 }
 
 function hoursPerDay(h: Hours) {
@@ -43,8 +49,9 @@ export default async function AdminSettingsPage() {
   const settings = new Map((rows ?? []).map((r) => [r.key, r]));
   const hours = readHours(settings.get("business_hours")?.value);
   const appUrl = typeof settings.get("app_url")?.value === "string" ? (settings.get("app_url")!.value as string) : "";
-  const autoCloseRaw = Number(settings.get("auto_close_days")?.value);
-  const autoClose = Number.isInteger(autoCloseRaw) && autoCloseRaw > 0 ? autoCloseRaw : 7;
+  const autoClose = intSetting(settings.get("auto_close_days")?.value, 7);
+  const remindDays = intSetting(settings.get("pending_reminder_days")?.value, 3);
+  const resolveDays = intSetting(settings.get("pending_auto_resolve_days")?.value, 5);
   const lastSla = settings.get("sla_last_run")?.value;
   const lastSlaText = typeof lastSla === "string" && !lastSla.startsWith("1970") ? formatDateTime(lastSla) : "Never";
   const legacyCount = legacy.count ?? 0;
@@ -58,7 +65,7 @@ export default async function AdminSettingsPage() {
       <PageHeader title="Settings" description="Desk-wide settings. Only desk admins can see this page." breadcrumbs={[{ label: "Administration" }, { label: "Settings" }]} />
 
       <div className="grid grid-cols-1 gap-5 lg:grid-cols-2">
-        <Card className="lg:row-span-2">
+        <Card className="lg:row-span-3">
           <CardHeader
             title={
               <span className="flex items-center gap-2">
@@ -69,7 +76,7 @@ export default async function AdminSettingsPage() {
             description="SLA clocks only run during these hours. Public holidays from People Success are skipped automatically."
           />
           <CardBody>
-            <ActionForm action={saveBusinessHours} resetOnSuccess={false} className="space-y-5">
+            <ActionForm key={JSON.stringify(hours)} action={saveBusinessHours} resetOnSuccess={false} className="space-y-5">
               <fieldset>
                 <legend className="mb-1.5 block text-xs font-medium text-slate-600">Working days</legend>
                 <div className="flex flex-wrap gap-2">
@@ -126,7 +133,7 @@ export default async function AdminSettingsPage() {
             description="Requesters also get desk notifications in People Success. Their links point here."
           />
           <CardBody>
-            <ActionForm action={saveAppUrl} resetOnSuccess={false} className="space-y-4">
+            <ActionForm key={appUrl} action={saveAppUrl} resetOnSuccess={false} className="space-y-4">
               <Field
                 label="Web address of this desk"
                 htmlFor="app-url"
@@ -152,11 +159,43 @@ export default async function AdminSettingsPage() {
             description="Resolved tickets close by themselves after this many days. Until then, the requester can reopen them."
           />
           <CardBody>
-            <ActionForm action={saveAutoClose} resetOnSuccess={false} className="flex flex-wrap items-end gap-3">
+            <ActionForm key={autoClose} action={saveAutoClose} resetOnSuccess={false} className="flex flex-wrap items-end gap-3">
               <Field label="Close resolved tickets after (days)" htmlFor="auto-close" className="w-56">
                 <Input id="auto-close" name="auto_close_days" type="number" min={1} max={60} step={1} defaultValue={autoClose} required />
               </Field>
               <SubmitButton>Save</SubmitButton>
+            </ActionForm>
+          </CardBody>
+        </Card>
+
+        <Card>
+          <CardHeader
+            title={
+              <span className="flex items-center gap-2">
+                <BellRing className="h-4 w-4 text-primary-600" />
+                Waiting on the requester
+              </span>
+            }
+            description="When a ticket is pending a reply from the requester, the desk nudges them and then tidies up. Days count working days only."
+          />
+          <CardBody>
+            <ActionForm key={`${remindDays}-${resolveDays}`} action={savePendingFollowUp} resetOnSuccess={false} className="space-y-4">
+              <div className="grid grid-cols-1 gap-4 sm:grid-cols-2">
+                <Field label="Remind requesters after (working days)" htmlFor="pending-remind" hint={`1 to ${PENDING_LIMITS.reminderMax}.`}>
+                  <Input id="pending-remind" name="pending_reminder_days" type="number" min={1} max={PENDING_LIMITS.reminderMax} step={1} defaultValue={remindDays} required />
+                </Field>
+                <Field label="Resolve automatically after (working days)" htmlFor="pending-resolve" hint={`More than the reminder, up to ${PENDING_LIMITS.resolveMax}.`}>
+                  <Input id="pending-resolve" name="pending_auto_resolve_days" type="number" min={2} max={PENDING_LIMITS.resolveMax} step={1} defaultValue={resolveDays} required />
+                </Field>
+              </div>
+              <p className="rounded-lg bg-slate-50 p-3 text-xs leading-relaxed text-slate-600">
+                Right now: after <strong>{remindDays}</strong> working day{remindDays === 1 ? "" : "s"} without a reply the requester gets a reminder; after{" "}
+                <strong>{resolveDays}</strong> (counted from when the ticket started waiting) it is marked resolved, and they can still reopen it for {autoClose} day
+                {autoClose === 1 ? "" : "s"}.
+              </p>
+              <div className="flex justify-end">
+                <SubmitButton>Save</SubmitButton>
+              </div>
             </ActionForm>
           </CardBody>
         </Card>

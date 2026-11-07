@@ -93,7 +93,7 @@ export default async function AdminCatalogPage({ searchParams }: { searchParams:
             }
           />
         ) : (
-          <Table>
+          <Table className="relative">
             <THead>
               <TR>
                 <TH>Item</TH>

@@ -55,7 +55,13 @@ export function ActionButton({
       if (v !== null && v !== undefined) fd.set(k, String(v));
     }
     startTransition(async () => {
-      const res = await action(null, fd);
+      let res: Awaited<ReturnType<typeof action>>;
+      try {
+        res = await action(null, fd);
+      } catch (err) {
+        toast.error(err instanceof Error && err.message ? err.message : "Something went wrong. Check your connection and try again.");
+        return;
+      }
       if (res?.ok) {
         toast.success(res.message ?? successMessage ?? "Done");
         setOpen(false);

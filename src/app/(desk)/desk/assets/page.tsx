@@ -154,7 +154,7 @@ export default async function AssetsPage({ searchParams }: { searchParams: Promi
           )
         ) : (
           <>
-            <Table>
+            <Table className="relative">
               <caption className="sr-only">Assets</caption>
               <THead>
                 <TR className="hover:bg-transparent">

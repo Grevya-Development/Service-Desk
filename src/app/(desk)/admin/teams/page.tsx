@@ -1,8 +1,9 @@
 import Link from "next/link";
-import { Boxes, Plus, Settings2, Shuffle, Ticket, Users } from "lucide-react";
+import { Boxes, Coffee, Plus, Settings2, Shuffle, Ticket, Users } from "lucide-react";
 import { requireLead } from "@/lib/auth";
 import { createClient } from "@/lib/supabase/server";
 import { OPEN_STATUSES } from "@/lib/constants";
+import { orgToday } from "@/lib/utils";
 import { Avatar, Badge, Button, Card, EmptyState, PageHeader, buttonClass } from "@/components/ui";
 import { Dialog } from "@/components/ui/dialog";
 import { NamedIcon, TEAM_ICONS } from "../_lib/icons";
@@ -10,7 +11,7 @@ import { TeamForm } from "./_components/team-form";
 
 export const metadata = { title: "Teams & agents" };
 
-type MemberRow = { team_id: string; role: string; person: { full_name: string | null; avatar_url: string | null } | null };
+type MemberRow = { team_id: string; employee_id: string; role: string; person: { full_name: string | null; avatar_url: string | null } | null };
 
 export default async function AdminTeamsPage() {
   const me = await requireLead();
@@ -23,10 +24,14 @@ export default async function AdminTeamsPage() {
     .order("sort_order")
     .order("name");
   if (!me.isAdmin) query = query.in("id", me.leadTeamIds.length ? me.leadTeamIds : ["00000000-0000-0000-0000-000000000000"]);
-  const [{ data: teams }, { data: members }] = await Promise.all([
+  const today = orgToday();
+  const [{ data: teams }, { data: members }, { data: awayRows }] = await Promise.all([
     query,
-    supabase.from("team_members").select("team_id, role, person:people!employee_id(full_name, avatar_url)"),
+    supabase.from("team_members").select("team_id, employee_id, role, person:people!employee_id(full_name, avatar_url)"),
+    supabase.from("agent_profiles").select("employee_id, away_until").eq("away", true),
   ]);
+  // Same rule as the database's is_away(): no end date, or it hasn't passed yet.
+  const awayIds = new Set((awayRows ?? []).filter((a) => !a.away_until || a.away_until >= today).map((a) => a.employee_id));
 
   const byTeam = new Map<string, MemberRow[]>();
   for (const m of (members ?? []) as MemberRow[]) byTeam.set(m.team_id, [...(byTeam.get(m.team_id) ?? []), m]);
@@ -66,6 +71,7 @@ export default async function AdminTeamsPage() {
             const rows = byTeam.get(t.id) ?? [];
             const leads = rows.filter((m) => m.role === "lead");
             const open = t.open?.[0]?.count ?? 0;
+            const away = rows.filter((m) => awayIds.has(m.employee_id)).length;
             return (
               <Card key={t.id} className={`overflow-hidden ${t.active ? "" : "opacity-80"}`}>
                 <div className="h-1.5" style={{ backgroundColor: t.color }} />
@@ -104,6 +110,12 @@ export default async function AdminTeamsPage() {
                       <Shuffle className="h-3 w-3" />
                       {t.auto_assign ? "Auto-assign on" : "Manual assignment"}
                     </Badge>
+                    {away > 0 && (
+                      <Badge tone="yellow" className="gap-1">
+                        <Coffee className="h-3 w-3" />
+                        {away} away{t.auto_assign ? ", skipped by auto-assign" : ""}
+                      </Badge>
+                    )}
                     {t.manages_assets && (
                       <Badge tone="teal" className="gap-1">
                         <Boxes className="h-3 w-3" />

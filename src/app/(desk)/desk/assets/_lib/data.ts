@@ -47,8 +47,8 @@ export function parseAssetFilters(params: Params): AssetFilters {
   const location = read(params, "location");
   const page = Number(read(params, "page") ?? "1");
   return {
-    type: type && type in ASSET_TYPES ? type : null,
-    status: status && status in ASSET_STATUSES ? status : null,
+    type: type && Object.hasOwn(ASSET_TYPES, type) ? type : null,
+    status: status && Object.hasOwn(ASSET_STATUSES, status) ? status : null,
     location: location === "none" || (location && UUID_RE.test(location)) ? location : null,
     person: safeSearch(read(params, "person")),
     q: safeSearch(read(params, "q")),

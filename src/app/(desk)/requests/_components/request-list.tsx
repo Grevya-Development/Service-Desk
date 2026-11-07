@@ -17,10 +17,12 @@ export type RequestListItem = {
   updated_at: string;
   team: { name: string; color: string } | null;
   assignee: { full_name: string | null } | null;
+  /** Present on the "Following" tab. */
+  requester?: { full_name: string | null } | null;
 };
 
 /** The requester's tickets: a table on larger screens, stacked cards on phones. */
-export function RequestList({ items, now }: { items: RequestListItem[]; now: number }) {
+export function RequestList({ items, now, showRequester = false }: { items: RequestListItem[]; now: number; showRequester?: boolean }) {
   return (
     <>
       {/* Phones */}
@@ -40,6 +42,7 @@ export function RequestList({ items, now }: { items: RequestListItem[]; now: num
                   <PriorityDot priority={t.priority} />
                 </div>
                 <p className="mt-1.5 text-xs text-slate-500">
+                  {showRequester && t.requester?.full_name ? `Raised by ${t.requester.full_name} · ` : ""}
                   Updated {timeAgo(t.updated_at, now)}
                   {t.assignee?.full_name ? ` · with ${t.assignee.full_name}` : ""}
                 </p>
@@ -72,6 +75,7 @@ export function RequestList({ items, now }: { items: RequestListItem[]; now: num
                   <Link href={`/requests/${t.number}`} className="font-medium text-slate-900 after:absolute after:inset-0 hover:text-primary-700">
                     <span className="line-clamp-2">{t.subject}</span>
                   </Link>
+                  {showRequester && t.requester?.full_name && <span className="mt-0.5 block text-xs text-slate-500">Raised by {t.requester.full_name}</span>}
                   {t.approval_status === "pending" && <ApprovalBadge status={t.approval_status} className="mt-1" />}
                 </TD>
                 <TD>

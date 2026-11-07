@@ -49,8 +49,8 @@ function parseAssetForm(fd: FormData): { row: AssetInsert } | { error: string } 
   if (!asset_tag || asset_tag.length < 2 || asset_tag.length > 40) return { error: "Asset tag must be 2–40 characters." };
   if (!/^[\w./#-]+$/.test(asset_tag)) return { error: "Asset tag can use letters, numbers and - _ . / # only (no spaces)." };
   if (!name || name.length < 2 || name.length > 120) return { error: "Name must be 2–120 characters." };
-  if (!(type in ASSET_TYPES)) return { error: "Pick a valid type." };
-  if (!(status in ASSET_STATUSES)) return { error: "Pick a valid status." };
+  if (!Object.hasOwn(ASSET_TYPES, type)) return { error: "Pick a valid type." };
+  if (!Object.hasOwn(ASSET_STATUSES, status)) return { error: "Pick a valid status." };
   if (assigned_to && !UUID_RE.test(assigned_to)) return { error: "Pick a person from the list." };
   if (location_id && !UUID_RE.test(location_id)) return { error: "Pick a location from the list." };
   if (status === "assigned" && !assigned_to) return { error: "Choose who has this asset, or pick a different status." };

@@ -29,7 +29,7 @@ export function ChartCard({
               <span className="group-open:hidden">Show as table</span>
               <span className="hidden group-open:inline">Hide table</span>
             </summary>
-            <div className="mt-2 max-h-72 overflow-auto rounded-lg border border-slate-100 thin-scroll">
+            <div className="relative mt-2 max-h-72 overflow-auto rounded-lg border border-slate-100 thin-scroll">
               <table className="w-full text-left">
                 <caption className="sr-only">{title}</caption>
                 <thead className="sticky top-0 bg-slate-50 text-slate-500">

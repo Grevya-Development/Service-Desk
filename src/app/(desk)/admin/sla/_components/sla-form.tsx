@@ -8,7 +8,7 @@ import { PriorityBadge } from "@/components/tickets/badges";
 import { PRIORITY_META, type Priority } from "@/lib/constants";
 import { formatTarget } from "@/lib/sla";
 import { cn } from "@/lib/utils";
-import { BUSINESS_DAY_MINS, SLA_LIMITS, SLA_UNITS, bestUnit, type SlaUnit } from "../../_lib/validate";
+import { SLA_LIMITS, SLA_UNIT_KEYS, bestUnit, unitMinutes, type SlaUnit } from "../../_lib/validate";
 import { saveSla } from "../actions";
 
 type Kind = "first_response" | "resolution";
@@ -18,27 +18,29 @@ export type SlaRow = { priority: Priority; first_response_mins: number; resoluti
 const ORDER: Priority[] = ["urgent", "high", "medium", "low"];
 const UNIT_LABELS: Record<SlaUnit, string> = { minutes: "minutes", hours: "hours", days: "business days" };
 
-function toMinutes(e: Entry): number | null {
+/** Minutes for an entry; null when empty or not a positive number. */
+function toMinutes(e: Entry, dayMins: number): number | null {
   if (e.value.trim() === "") return null;
   const n = Number(e.value);
   if (!Number.isFinite(n) || n <= 0) return null;
-  return Math.round(n * SLA_UNITS[e.unit]);
+  return Math.round(n * unitMinutes(e.unit, dayMins));
 }
 
-function initial(mins: number): Entry {
-  const b = bestUnit(mins);
+function initial(mins: number, dayMins: number): Entry {
+  const b = bestUnit(mins, dayMins);
   return { value: String(b.value), unit: b.unit };
 }
 
-function daysHint(mins: number) {
-  if (mins < BUSINESS_DAY_MINS) return null;
-  const d = mins / BUSINESS_DAY_MINS;
+function daysHint(mins: number, dayMins: number) {
+  if (mins < dayMins) return null;
+  const d = mins / dayMins;
   return `≈ ${Number.isInteger(d) ? d : d.toFixed(1)} business day${d === 1 ? "" : "s"}`;
 }
 
-export function SlaForm({ teamId, rows }: { teamId: string; rows: SlaRow[] }) {
+/** `dayMins` = length of one working day from the business-hours setting. */
+export function SlaForm({ teamId, rows, dayMins }: { teamId: string; rows: SlaRow[]; dayMins: number }) {
   const [state, setState] = useState(() =>
-    Object.fromEntries(rows.map((r) => [r.priority, { first_response: initial(r.first_response_mins), resolution: initial(r.resolution_mins) }])) as Record<
+    Object.fromEntries(rows.map((r) => [r.priority, { first_response: initial(r.first_response_mins, dayMins), resolution: initial(r.resolution_mins, dayMins) }])) as Record<
       Priority,
       Record<Kind, Entry>
     >,
@@ -47,10 +49,11 @@ export function SlaForm({ teamId, rows }: { teamId: string; rows: SlaRow[] }) {
   const set = (p: Priority, k: Kind, patch: Partial<Entry>) => setState((s) => ({ ...s, [p]: { ...s[p], [k]: { ...s[p][k], ...patch } } }));
 
   const computed = ORDER.map((p) => {
-    const fr = toMinutes(state[p].first_response);
-    const res = toMinutes(state[p].resolution);
+    const fr = toMinutes(state[p].first_response, dayMins);
+    const res = toMinutes(state[p].resolution, dayMins);
     let error: string | null = null;
-    if (fr === null || res === null) error = "Enter both targets.";
+    if (fr === null || res === null) error = "Enter both targets as numbers above zero.";
+    else if (fr < 1 || res < 1) error = "Each target must be at least 1 minute.";
     else if (fr > SLA_LIMITS.firstResponse) error = `First response can be at most ${formatTarget(SLA_LIMITS.firstResponse)}.`;
     else if (res > SLA_LIMITS.resolution) error = `Resolution can be at most ${formatTarget(SLA_LIMITS.resolution)}.`;
     else if (res < fr) error = "Resolution can't be shorter than first response.";
@@ -99,7 +102,7 @@ export function SlaForm({ teamId, rows }: { teamId: string; rows: SlaRow[] }) {
                       {label} unit
                     </label>
                     <Select id={`${id}-unit`} value={state[p][k].unit} onChange={(e) => set(p, k, { unit: e.target.value as SlaUnit })} className="w-40">
-                      {(Object.keys(SLA_UNITS) as SlaUnit[]).map((u) => (
+                      {SLA_UNIT_KEYS.map((u) => (
                         <option key={u} value={u}>
                           {UNIT_LABELS[u]}
                         </option>
@@ -110,7 +113,7 @@ export function SlaForm({ teamId, rows }: { teamId: string; rows: SlaRow[] }) {
                     {mins ? (
                       <>
                         = <span className="font-medium text-slate-700">{formatTarget(mins)}</span> of business time
-                        {daysHint(mins) && <span className="text-slate-400"> ({daysHint(mins)})</span>}
+                        {daysHint(mins, dayMins) && <span className="text-slate-400"> ({daysHint(mins, dayMins)})</span>}
                       </>
                     ) : (
                       "—"

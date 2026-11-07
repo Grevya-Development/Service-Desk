@@ -2,13 +2,13 @@
 
 import Link from "next/link";
 import { useEffect, useId, useRef, useState } from "react";
-import { ArrowLeft, BookOpen, Check, Lightbulb, Paperclip, Send, X } from "lucide-react";
+import { ArrowLeft, BookOpen, Check, Lightbulb, Send } from "lucide-react";
 import { ActionForm, SubmitButton } from "@/components/ui/action-form";
 import { Card, CardBody, Field, Input, Select, Textarea } from "@/components/ui";
-import { formatBytes } from "@/components/tickets/conversation";
-import { ASSET_TYPES, MAX_ATTACHMENTS, MAX_ATTACHMENT_BYTES, PRIORITIES, PRIORITY_META, type Priority } from "@/lib/constants";
+import { ASSET_TYPES, PRIORITIES, PRIORITY_META, type Priority } from "@/lib/constants";
 import { searchArticles, type ArticleHit } from "@/lib/kb/search";
 import { cn } from "@/lib/utils";
+import { FileDropZone, filesProblem } from "../../_components/file-drop-zone";
 import { createRequest } from "../actions";
 import { TeamIcon } from "./team-icon";
 
@@ -47,7 +47,6 @@ export function NewRequestForm({
   const [files, setFiles] = useState<File[]>([]);
   const timer = useRef<ReturnType<typeof setTimeout> | null>(null);
   const requestId = useRef(0);
-  const fileInput = useRef<HTMLInputElement>(null);
 
   useEffect(() => () => {
     if (timer.current) clearTimeout(timer.current);
@@ -83,18 +82,7 @@ export function NewRequestForm({
     }, 350);
   };
 
-  const totalBytes = files.reduce((n, f) => n + f.size, 0);
-  const fileProblem =
-    files.length > MAX_ATTACHMENTS
-      ? `You can attach up to ${MAX_ATTACHMENTS} files.`
-      : totalBytes > MAX_ATTACHMENT_BYTES
-        ? `Files must be 4 MB or less in total (these are ${formatBytes(totalBytes)}).`
-        : null;
-
-  const clearFiles = () => {
-    if (fileInput.current) fileInput.current.value = "";
-    setFiles([]);
-  };
+  const fileProblem = filesProblem(files);
 
   // ---------------------------------------------------------------- Step 1
   if (!team) {
@@ -246,47 +234,7 @@ export function NewRequestForm({
             </Field>
           )}
 
-          <div>
-            <p className="mb-1.5 text-xs font-medium text-slate-600">Attachments</p>
-            <label
-              htmlFor={`${ids}-files`}
-              className="flex cursor-pointer flex-col items-center justify-center gap-1 rounded-lg border border-dashed border-slate-300 bg-slate-50/60 px-4 py-5 text-center text-sm text-slate-600 transition hover:border-primary-500 hover:bg-primary-50/40"
-            >
-              <Paperclip className="h-5 w-5 text-slate-400" aria-hidden />
-              <span className="font-medium text-primary-600">Choose files</span>
-              <span className="text-xs text-slate-500">Screenshots, photos or documents. Up to {MAX_ATTACHMENTS} files, 4 MB in total.</span>
-            </label>
-            <input
-              ref={fileInput}
-              id={`${ids}-files`}
-              type="file"
-              name="files"
-              multiple
-              className="sr-only"
-              onChange={(e) => setFiles(Array.from(e.target.files ?? []))}
-            />
-            {files.length > 0 && (
-              <div className="mt-2 space-y-1.5">
-                <ul className="flex flex-wrap gap-2">
-                  {files.map((f, i) => (
-                    <li key={`${f.name}-${i}`} className="inline-flex max-w-full items-center gap-1.5 rounded-lg border border-slate-200 bg-white px-2.5 py-1.5 text-xs text-slate-700">
-                      <Paperclip className="h-3.5 w-3.5 shrink-0 text-slate-400" aria-hidden />
-                      <span className="truncate">{f.name}</span>
-                      <span className="shrink-0 text-slate-400">{formatBytes(f.size)}</span>
-                    </li>
-                  ))}
-                </ul>
-                <button type="button" onClick={clearFiles} className="inline-flex items-center gap-1 text-xs font-medium text-slate-500 hover:text-slate-800">
-                  <X className="h-3.5 w-3.5" /> Remove files
-                </button>
-              </div>
-            )}
-            {fileProblem && (
-              <p role="alert" className="mt-1.5 text-xs font-medium text-red-600">
-                {fileProblem}
-              </p>
-            )}
-          </div>
+          <FileDropZone files={files} onChange={setFiles} hint="Screenshots of the error, photos or documents." />
         </CardBody>
       </Card>
 

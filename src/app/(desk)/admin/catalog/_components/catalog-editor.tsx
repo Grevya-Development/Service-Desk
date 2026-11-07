@@ -455,8 +455,8 @@ function PreviewField({ field, id }: { field: CatalogField; id: string }) {
           <option value="" disabled>
             Choose…
           </option>
-          {(field.options ?? []).map((o) => (
-            <option key={o}>{o}</option>
+          {(field.options ?? []).map((o, i) => (
+            <option key={`${i}-${o}`}>{o}</option>
           ))}
         </Select>
       );

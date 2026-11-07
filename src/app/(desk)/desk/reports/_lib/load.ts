@@ -37,17 +37,26 @@ export function parseRange(params: Params, today: string): ReportRange {
   return { ...presetRange("30d", today), preset: "30d" };
 }
 
-/** PostgREST returns at most 1000 rows per request, so page through up to ROW_CAP. */
-async function pageAll(fetchPage: (from: number, to: number) => PromiseLike<{ data: unknown[] | null; error: { message: string } | null }>) {
-  const rows: ReportTicket[] = [];
-  for (let from = 0; from < ROW_CAP; from += 1000) {
-    const to = Math.min(ROW_CAP, from + 1000) - 1;
+/** PostgREST returns at most 1000 rows per request, so page through up to `cap` rows. */
+export async function pageAll<T = ReportTicket>(
+  fetchPage: (from: number, to: number) => PromiseLike<{ data: unknown[] | null; error: { message: string } | null }>,
+  cap = ROW_CAP,
+) {
+  const rows: T[] = [];
+  for (let from = 0; from < cap; from += 1000) {
+    const to = Math.min(cap, from + 1000) - 1;
     const { data, error } = await fetchPage(from, to);
     if (error) return { rows, capped: false, error: error.message };
-    rows.push(...((data ?? []) as ReportTicket[]));
+    rows.push(...((data ?? []) as T[]));
     if (!data || data.length < to - from + 1) return { rows, capped: false, error: null };
   }
-  return { rows, capped: rows.length >= ROW_CAP, error: null };
+  return { rows, capped: rows.length >= cap, error: null };
+}
+
+/** The teams a report covers: the requested team if the viewer works in it, else all their teams. */
+export function reportTeamIds(agentTeamIds: string[], teamParam: string | string[] | undefined | null): string[] {
+  const t = typeof teamParam === "string" ? teamParam : null;
+  return t && agentTeamIds.includes(t) ? [t] : agentTeamIds;
 }
 
 /** Tickets created or resolved in the range, plus everything open right now, for the given teams. */

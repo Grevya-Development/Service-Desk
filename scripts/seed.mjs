@@ -62,6 +62,7 @@ try {
     for (const [t, e, r] of members) await tx`insert into servicedesk.team_members (team_id, employee_id, role, created_at) values (${t}, ${e}, ${r}, ${ago(60)})`;
 
     // ---- catalog -----------------------------------------------------------
+    const itemFields = {};
     const item = async (team, cat, name, description, icon, approval, priority, days, fields, sort) => {
       const [r] = await tx`insert into servicedesk.catalog_items (team_id, category_id, name, description, icon, approval, default_priority, expected_days, fields, sort_order)
         values (${teams[team]}, ${cats[`${team}:${cat}`] ?? null}, ${name}, ${description}, ${icon}, ${approval}, ${priority}, ${days}, ${tx.json(fields)}, ${sort}) returning id`;
@@ -169,7 +170,21 @@ try {
 
     // ---- tickets -----------------------------------------------------------
     const tickets = [];
+    // Same "- **Label:** value" list the catalog form generates, so answers aren't shown twice.
+    const answersMarkdown = (fields, answers) =>
+      fields
+        .filter((f) => f.key in answers)
+        .map((f) => {
+          const v = answers[f.key];
+          const shown =
+            typeof v === "boolean" ? (v ? "Yes" : "No")
+            : f.type === "date" ? new Date(`${v}T00:00:00`).toLocaleDateString("en-GB", { day: "2-digit", month: "short", year: "numeric" })
+            : String(v);
+          return `- **${f.label.replace(/\*/g, "")}:** ${shown}`;
+        })
+        .join("\n");
     const ticket = async (t) => {
+      if (t.item && t.form && itemFields[t.item]) t.description = answersMarkdown(itemFields[t.item], t.form);
       const row = {
         team_id: teams[t.team],
         category_id: cats[`${t.team}:${t.category}`] ?? null,

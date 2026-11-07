@@ -3,7 +3,7 @@
  * by /desk/reports and unit tested in tests/reports.test.ts.
  *
  * Calendar days are India days (Asia/Kolkata, UTC+05:30, no daylight saving),
- * matching how the rest of the desk shows dates.
+ * matching how the rest of the desk shows dates (and the ticket CSV export).
  */
 
 export type ReportTicket = {
@@ -121,32 +121,44 @@ export function inRange(iso: string | null, start: string, end: string): boolean
 /** When the SLA clock started: approval time for requests that needed one, else creation. */
 const clockStart = (t: ReportTicket) => t.approved_at ?? t.created_at;
 
+type SlaFields = Pick<ReportTicket, "first_response_due" | "first_responded_at" | "response_breached" | "resolution_due" | "resolved_at" | "resolution_breached">;
+
 /**
- * First-response SLA among tickets that have a target and an outcome
- * (they got a first reply, or the target was breached).
+ * Was the first-response target met? null when there is no target or no
+ * outcome yet (no reply and not breached).
  */
-export function responseSlaRate(tickets: ReportTicket[]): Rate {
+export function responseSlaMet(t: SlaFields): boolean | null {
+  if (!t.first_response_due) return null;
+  if (!t.first_responded_at && !t.response_breached) return null;
+  return Boolean(t.first_responded_at && !t.response_breached && ms(t.first_responded_at) <= ms(t.first_response_due));
+}
+
+/** Was the resolution target met? null unless the ticket is resolved and had a target. */
+export function resolutionSlaMet(t: SlaFields): boolean | null {
+  if (!t.resolved_at || !t.resolution_due) return null;
+  return !t.resolution_breached && ms(t.resolved_at) <= ms(t.resolution_due);
+}
+
+function slaRate(tickets: ReportTicket[], outcome: (t: ReportTicket) => boolean | null): Rate {
   let met = 0;
   let total = 0;
   for (const t of tickets) {
-    if (!t.first_response_due) continue;
-    if (!t.first_responded_at && !t.response_breached) continue;
+    const o = outcome(t);
+    if (o === null) continue;
     total++;
-    if (t.first_responded_at && !t.response_breached && ms(t.first_responded_at) <= ms(t.first_response_due)) met++;
+    if (o) met++;
   }
   return rate(met, total);
 }
 
+/** First-response SLA among tickets that have a target and an outcome (a first reply, or a breach). */
+export function responseSlaRate(tickets: ReportTicket[]): Rate {
+  return slaRate(tickets, responseSlaMet);
+}
+
 /** Resolution SLA among resolved tickets that had a resolution target. */
 export function resolutionSlaRate(tickets: ReportTicket[]): Rate {
-  let met = 0;
-  let total = 0;
-  for (const t of tickets) {
-    if (!t.resolved_at || !t.resolution_due) continue;
-    total++;
-    if (!t.resolution_breached && ms(t.resolved_at) <= ms(t.resolution_due)) met++;
-  }
-  return rate(met, total);
+  return slaRate(tickets, resolutionSlaMet);
 }
 
 /** Wall-clock minutes from clock start to first reply (null if no reply yet). */
@@ -347,5 +359,33 @@ export function buildKpis({ tickets, open, from, to }: ReportInput): { kpis: Rep
       medianResolutionMins: medianResolution(resolved),
       csat: csatSummary(resolved),
     },
+  };
+}
+
+// ---------------------------------------------------------------------------
+// Incidents
+// ---------------------------------------------------------------------------
+
+export type ReportIncident = { id: string; started_at: string; resolved_at: string | null; status: string };
+export type IncidentSummary = { declared: number; resolved: number; stillOpen: number; medianResolveMins: number | null };
+
+/**
+ * Incidents declared (started) in the India-day range, how many of those are
+ * resolved / still open, and the median wall-clock minutes from start to resolution.
+ */
+export function incidentSummary(incidents: ReportIncident[], from: string, to: string): IncidentSummary {
+  const { start, end } = rangeBounds(from, to);
+  const declared = incidents.filter((i) => inRange(i.started_at, start, end));
+  const durations: number[] = [];
+  for (const i of declared) {
+    if (!i.resolved_at) continue;
+    const m = (ms(i.resolved_at) - ms(i.started_at)) / 60_000;
+    if (Number.isFinite(m)) durations.push(Math.max(0, m));
+  }
+  return {
+    declared: declared.length,
+    resolved: durations.length,
+    stillOpen: declared.filter((i) => !i.resolved_at && i.status !== "resolved").length,
+    medianResolveMins: median(durations),
   };
 }

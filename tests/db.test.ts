@@ -27,6 +27,7 @@ describe.skipIf(!enabled)("servicedesk database", () => {
   let priya: Client, kavin: Client, manoj: Client, hr: Client;
   let ids: Record<string, string>;
   let teams: Record<string, string>;
+  let savedHours: unknown;
 
   beforeAll(async () => {
     admin = createClient(URL_, SERVICE, { db: { schema: "servicedesk" }, auth: { persistSession: false } }) as Client;
@@ -35,10 +36,15 @@ describe.skipIf(!enabled)("servicedesk database", () => {
     ids = Object.fromEntries((people ?? []).map((p) => [p.email.split("@")[0], p.id]));
     const { data: t } = await admin.from("teams").select("id, key");
     teams = Object.fromEntries((t ?? []).map((x) => [x.key, x.id]));
+    // Pin the default business hours so SLA maths is deterministic, whatever Settings currently say.
+    const { data: bh } = await admin.from("settings").select("value").eq("key", "business_hours").single();
+    savedHours = bh?.value;
+    await admin.from("settings").update({ value: { days: [1, 2, 3, 4, 5], start: "09:30", end: "18:30", timezone: "Asia/Kolkata" } }).eq("key", "business_hours");
   });
 
   afterAll(async () => {
     if (created.length) await admin.from("tickets").delete().in("id", created);
+    if (savedHours) await admin.from("settings").update({ value: savedHours }).eq("key", "business_hours");
   });
 
   async function raise(client: Client, team: "it" | "hr", extra: Record<string, unknown> = {}) {
@@ -133,6 +139,16 @@ describe.skipIf(!enabled)("servicedesk database", () => {
       const { data: after } = await admin.from("tickets").select("status, pending_since").eq("id", t.id).single();
       expect(after?.status).toBe("open");
       expect(after?.pending_since).toBeNull();
+    });
+
+    it("lets an agent transfer a ticket to a team they're not on", async () => {
+      const t = await raise(priya, "it");
+      const { error } = await manoj.rpc("transfer_ticket", { p_ticket: t.id, p_team: teams.hr });
+      expect(error).toBeNull();
+      const { data } = await admin.from("tickets").select("team_id, assignee_id").eq("id", t.id).single();
+      expect(data).toEqual({ team_id: teams.hr, assignee_id: null });
+      const { error: again } = await manoj.rpc("transfer_ticket", { p_ticket: t.id, p_team: teams.it });
+      expect(again).toBeTruthy(); // no longer his team's ticket
     });
 
     it("lets requesters reopen a resolved ticket and logs events", async () => {

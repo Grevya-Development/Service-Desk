@@ -16,7 +16,7 @@ export default async function DeskLayout({ children }: LayoutProps<"/">) {
   const supabase = await createClient();
 
   const head = { count: "exact" as const, head: true };
-  const [notes, unread, myApprovals, leadApprovals, unassigned, reports, incidents, profile] = await Promise.all([
+  const [notes, unread, myApprovals, leadApprovals, unassigned, reports, incidents, profile, teamIncidents] = await Promise.all([
     supabase.from("notifications").select("id, title, body, link, read_at, created_at").eq("employee_id", me.id).order("created_at", { ascending: false }).limit(12),
     supabase.from("notifications").select("id", head).eq("employee_id", me.id).is("read_at", null),
     supabase.from("approvals").select("id", head).eq("status", "pending").eq("approver_id", me.id),
@@ -29,12 +29,15 @@ export default async function DeskLayout({ children }: LayoutProps<"/">) {
     supabase.schema("public").from("employees").select("id", head).eq("manager_id", me.id).neq("status", "exited"),
     supabase.from("incidents").select("id", head).neq("status", "resolved"),
     me.isAgent ? supabase.from("agent_profiles").select("away").eq("employee_id", me.id).maybeSingle() : Promise.resolve({ data: null }),
+    me.agentTeamIds.length
+      ? supabase.from("incidents").select("id", head).neq("status", "resolved").in("team_id", me.agentTeamIds)
+      : Promise.resolve({ count: 0 }),
   ]);
 
   const approvals = (myApprovals.count ?? 0) + (leadApprovals.count ?? 0);
   const sections = buildNav(
     { isAgent: me.isAgent, isLead: me.isLead, isAdmin: me.isAdmin, managesAssets: me.managesAssets, showApprovals: me.isLead || (reports.count ?? 0) > 0 },
-    { approvals, unassigned: unassigned.count ?? 0, activeIncidents: incidents.count ?? 0 },
+    { approvals, unassigned: unassigned.count ?? 0, activeIncidents: incidents.count ?? 0, myTeamIncidents: teamIncidents.count ?? 0 },
   );
 
   return (

@@ -1,4 +1,5 @@
 import type { Metadata } from "next";
+import { Suspense } from "react";
 import Link from "next/link";
 import { LifeBuoy } from "lucide-react";
 import { requireViewer } from "@/lib/auth";
@@ -6,6 +7,7 @@ import { createClient } from "@/lib/supabase/server";
 import { Card, EmptyState, PageHeader, buttonClass } from "@/components/ui";
 import { NewRequestForm } from "../_components/new-request-form";
 import { UUID_RE, param } from "../_lib/query";
+import { IncidentBanner } from "../../_components/incident-banner";
 
 export const metadata: Metadata = { title: "Report an issue" };
 
@@ -36,6 +38,9 @@ export default async function NewRequestPage({ searchParams }: { searchParams: P
         description="Tell us what's wrong and the right team will pick it up."
         breadcrumbs={[{ label: "Home", href: "/home" }, { label: "Report an issue" }]}
       />
+      <Suspense fallback={null}>
+        <IncidentBanner className="mb-6" />
+      </Suspense>
       {teamList.length === 0 ? (
         <Card>
           <EmptyState

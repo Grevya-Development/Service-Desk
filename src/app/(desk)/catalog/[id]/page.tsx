@@ -85,10 +85,10 @@ export default async function CatalogItemPage({ params }: { params: Promise<{ id
       approver = manager?.full_name ?? manager?.first_name ?? "your manager";
       approvalText = `Your manager, ${approver}, will be asked to approve this first.`;
     } else {
-      approvalText = `You don't have an active manager on file, so a ${team.name} team lead will approve this first.`;
+      approvalText = `You don't have an active manager on file, so a team lead from ${team.name} will approve this first.`;
     }
   } else if (item.approval === "team_lead") {
-    approvalText = `A ${team.name} team lead will approve this first.`;
+    approvalText = `A team lead from ${team.name} will approve this first.`;
   }
 
   const steps = [

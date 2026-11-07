@@ -40,15 +40,28 @@ export const WEEKDAYS = [
 /* SLA                                                                      */
 /* ------------------------------------------------------------------------ */
 
-/** One business day = one working day of 9 hours. */
+/** Fallback length of one business day (09:30–18:30) when the setting is unreadable. */
 export const BUSINESS_DAY_MINS = 540;
-export const SLA_UNITS = { minutes: 1, hours: 60, days: BUSINESS_DAY_MINS } as const;
-export type SlaUnit = keyof typeof SLA_UNITS;
+export const SLA_UNIT_KEYS = ["minutes", "hours", "days"] as const;
+export type SlaUnit = (typeof SLA_UNIT_KEYS)[number];
 export const SLA_LIMITS = { firstResponse: 100000, resolution: 500000 } as const;
 
+/** Minutes in one unit; a "day" is one working day as set in business hours. */
+export function unitMinutes(unit: SlaUnit, dayMins: number = BUSINESS_DAY_MINS): number {
+  return unit === "days" ? dayMins : unit === "hours" ? 60 : 1;
+}
+
+/** Length of the working day in minutes from "HH:MM" start/end (fallback 540). */
+export function workingDayMinutes(start: unknown, end: unknown): number {
+  if (typeof start !== "string" || typeof end !== "string" || !TIME_RE.test(start) || !TIME_RE.test(end)) return BUSINESS_DAY_MINS;
+  const toMins = (t: string) => Number(t.slice(0, 2)) * 60 + Number(t.slice(3, 5));
+  const mins = toMins(end) - toMins(start);
+  return mins > 0 ? mins : BUSINESS_DAY_MINS;
+}
+
 /** Pick the friendliest unit that represents `mins` exactly. */
-export function bestUnit(mins: number): { value: number; unit: SlaUnit } {
-  if (mins >= BUSINESS_DAY_MINS && mins % BUSINESS_DAY_MINS === 0) return { value: mins / BUSINESS_DAY_MINS, unit: "days" };
+export function bestUnit(mins: number, dayMins: number = BUSINESS_DAY_MINS): { value: number; unit: SlaUnit } {
+  if (dayMins > 0 && mins >= dayMins && mins % dayMins === 0) return { value: mins / dayMins, unit: "days" };
   if (mins >= 60 && mins % 60 === 0) return { value: mins / 60, unit: "hours" };
   return { value: mins, unit: "minutes" };
 }
@@ -140,6 +153,9 @@ export function parseStoredFields(value: unknown): CatalogField[] {
     (f): f is CatalogField => !!f && typeof f === "object" && typeof (f as CatalogField).key === "string" && typeof (f as CatalogField).label === "string" && isFieldType((f as CatalogField).type),
   );
 }
+
+/** Pending follow-ups (working days): reminder 1–30, auto-resolve after the reminder and at most 60. */
+export const PENDING_LIMITS = { reminderMax: 30, resolveMax: 60 } as const;
 
 /** http(s) URL without trailing slash, or null if invalid. */
 export function normalizeAppUrl(v: string): string | null {

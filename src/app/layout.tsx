@@ -19,7 +19,7 @@ export default function RootLayout({ children }: LayoutProps<"/">) {
     <html lang="en" className={`${roboto.variable} h-full antialiased`}>
       <body className="min-h-full font-sans">
         {children}
-        <Toaster position="top-right" richColors closeButton />
+        <Toaster position="bottom-right" richColors closeButton />
       </body>
     </html>
   );

@@ -2069,6 +2069,9 @@ isOneToOne: false
 "add_business_minutes":
 { Args: { "p_minutes": number,"p_start": string }; Returns: string
                            },
+"business_day_minutes":
+{ Args: Record<PropertyKey, never>; Returns: number
+                           },
 "business_hours":
 { Args: Record<PropertyKey, never>; Returns: Json
                            },
@@ -2235,6 +2238,9 @@ isOneToOne: false
       } },
 "system_mode":
 { Args: Record<PropertyKey, never>; Returns: boolean
+                           },
+"transfer_ticket":
+{ Args: { "p_assignee"?: string,"p_category"?: string,"p_team": string,"p_ticket": string }; Returns: undefined
                            }
           }
           Enums: {

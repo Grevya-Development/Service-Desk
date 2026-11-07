@@ -3,7 +3,9 @@ import Link from "next/link";
 import { redirect } from "next/navigation";
 import {
   AlertCircle,
+  ArrowRight,
   CheckCircle2,
+  GitMerge,
   Clock,
   Hourglass,
   Laptop,
@@ -13,7 +15,9 @@ import {
   Plus,
   ThumbsDown,
   ThumbsUp,
+  UserMinus,
   UserRound,
+  Users,
   XCircle,
   type LucideIcon,
 } from "lucide-react";
@@ -24,12 +28,16 @@ import { Avatar, Badge, Card, CardBody, CardHeader, PageHeader, buttonClass } fr
 import { ApprovalBadge, PriorityBadge, TicketStatusBadge } from "@/components/tickets/badges";
 import { AttachmentList, Conversation } from "@/components/tickets/conversation";
 import { Composer } from "@/components/tickets/composer";
+import { ActionButton } from "@/components/ui/action-button";
 import { Markdown } from "@/components/markdown";
 import { APPROVAL_META, ASSET_TYPES, OPEN_STATUSES, ticketRef, type CatalogField, type Status } from "@/lib/constants";
 import { cn, formatDate, formatDateTime } from "@/lib/utils";
 import { TeamChip } from "../_components/team-chip";
 import { CloseRequestButton, RatingWidget, ReopenButton } from "../_components/request-actions";
+import { FollowersPanel, type FollowerView } from "../_components/followers-panel";
+import { removeFollower } from "../actions";
 import { requestNow } from "../_lib/query";
+import { answersMarkdown, parseFields } from "../../catalog/_lib/fields";
 
 export async function generateMetadata({ params }: { params: Promise<{ number: string }> }): Promise<Metadata> {
   const { number } = await params;
@@ -46,8 +54,23 @@ export default async function RequestPage({ params }: { params: Promise<{ number
   if (!isRequester && me.agentTeamIds.includes(ticket.team_id)) redirect(`/desk/tickets/${ticket.number}`);
 
   const supabase = await createClient();
-  const { data: closeSetting } = await supabase.from("settings").select("value").eq("key", "auto_close_days").maybeSingle();
+  const [{ data: closeSetting }, { data: followerRows }, { data: mergedTarget }] = await Promise.all([
+    supabase.from("settings").select("value").eq("key", "auto_close_days").maybeSingle(),
+    supabase
+      .from("ticket_followers")
+      .select("employee_id, created_at, person:people!employee_id(id, full_name, email, avatar_url, designation)")
+      .eq("ticket_id", ticket.id)
+      .order("created_at"),
+    ticket.merged_into ? supabase.from("tickets").select("number").eq("id", ticket.merged_into).maybeSingle() : Promise.resolve({ data: null }),
+  ]);
   const closeDays = Number(closeSetting?.value ?? 7) || 7;
+  const followers = (followerRows ?? [])
+    .map((f) => f.person as unknown as FollowerView | null)
+    .filter((f): f is FollowerView => f !== null);
+  const isFollower = !isRequester && (followerRows ?? []).some((f) => f.employee_id === me.id);
+  // Followers can reply like the requester; only the requester closes, reopens or rates.
+  const canReply = (isRequester || isFollower) && ticket.status !== "closed";
+  const mergedRef = ticket.merged_into ? (mergedTarget ? ticketRef(mergedTarget.number) : "another request") : null;
 
   const status = ticket.status as Status;
   const isOpen = OPEN_STATUSES.includes(status);
@@ -56,12 +79,26 @@ export default async function RequestPage({ params }: { params: Promise<{ number
   const canRate = isRequester && !ticket.csat_rating && (ticket.status === "resolved" || (ticket.status === "closed" && Boolean(ticket.resolved_at)));
   const answers = formAnswers(ticket.form_data, ticket.catalog_item?.fields);
   const ref = ticketRef(ticket.number);
+  // Catalog requests without a note store the answers as the description: don't show them twice.
+  const description = ticket.description.trim();
+  const autoDescription =
+    ticket.type === "request" &&
+    answers.length > 0 &&
+    (description === answersMarkdown(parseFields(ticket.catalog_item?.fields), ticket.form_data).trim() ||
+      description === `Requested “${ticket.catalog_item?.name ?? ""}” from the service catalog.`);
+  const requesterName = ticket.requester?.full_name ?? "the requester";
 
   return (
     <div>
       <PageHeader
         title={ticket.subject}
-        breadcrumbs={isRequester ? [{ label: "My requests", href: "/requests" }, { label: ref }] : [{ label: "Approvals", href: "/approvals" }, { label: ref }]}
+        breadcrumbs={
+          isRequester
+            ? [{ label: "My requests", href: "/requests" }, { label: ref }]
+            : isFollower
+              ? [{ label: "Following", href: "/requests?tab=following" }, { label: ref }]
+              : [{ label: "Approvals", href: "/approvals" }, { label: ref }]
+        }
         actions={isRequester && isOpen ? <CloseRequestButton ticketId={ticket.id} /> : undefined}
       />
       <div className="-mt-3 mb-6 flex flex-wrap items-center gap-2 text-xs text-slate-500">
@@ -75,9 +112,46 @@ export default async function RequestPage({ params }: { params: Promise<{ number
 
       <div className="grid gap-6 lg:grid-cols-3">
         <div className="min-w-0 space-y-6 lg:col-span-2">
-          {!isRequester && (
+          {mergedRef && (
+            <div role="status" className="flex flex-col gap-3 rounded-xl border border-primary-200 bg-primary-50 px-5 py-4 sm:flex-row sm:items-center">
+              <GitMerge className="hidden h-5 w-5 shrink-0 text-primary-600 sm:block" aria-hidden />
+              <div className="min-w-0 flex-1 text-sm text-primary-900">
+                <p className="font-semibold">This request was merged into {mergedRef} — follow updates there</p>
+                <p className="mt-0.5 text-primary-800">The team is handling the same problem in one place. {isRequester ? "You've been added to it, so you'll still get every update." : ""}</p>
+              </div>
+              {mergedTarget && (
+                <Link href={`/requests/${mergedTarget.number}`} className={cn(buttonClass("primary", "sm"), "shrink-0")}>
+                  Go to {mergedRef} <ArrowRight className="h-3.5 w-3.5" aria-hidden />
+                </Link>
+              )}
+            </div>
+          )}
+
+          {isFollower && (
+            <div role="status" className="flex flex-col gap-3 rounded-xl border border-slate-200 bg-slate-50 px-5 py-4 text-slate-700 sm:flex-row sm:items-start">
+              <Users className="hidden h-5 w-5 shrink-0 text-slate-500 sm:mt-0.5 sm:block" aria-hidden />
+              <div className="min-w-0 flex-1 text-sm">
+                <p className="font-semibold">You&apos;re following this request</p>
+                <p className="mt-0.5 opacity-90">
+                  {requesterName} raised it. You get updates and can reply; only {ticket.requester?.full_name?.split(" ")[0] ?? "they"} can close or reopen it.
+                </p>
+              </div>
+              <ActionButton
+                action={removeFollower}
+                fields={{ ticket_id: ticket.id, employee_id: me.id }}
+                confirm="Stop following this request?"
+                variant="outline"
+                size="sm"
+                className="shrink-0 self-start"
+              >
+                <UserMinus className="h-3.5 w-3.5" aria-hidden /> Stop following
+              </ActionButton>
+            </div>
+          )}
+
+          {!isRequester && !isFollower && (
             <Callout icon={Lock} tone="slate" title="You're viewing this as an approver">
-              Only {ticket.requester?.full_name ?? "the requester"} and the support team can reply here.
+              Only {requesterName}, people they&apos;ve added and the support team can reply here.
               {ticket.approval_status === "pending" && (
                 <>
                   {" "}
@@ -123,13 +197,15 @@ export default async function RequestPage({ params }: { params: Promise<{ number
             </Card>
           )}
 
-          {ticket.status === "closed" && (
+          {ticket.status === "closed" && !mergedRef && (
             <Card className="overflow-hidden">
               <div className="flex items-start gap-3 bg-slate-50 px-5 py-4">
                 <CheckCircle2 className="mt-0.5 h-5 w-5 shrink-0 text-slate-500" aria-hidden />
                 <div className="min-w-0 text-sm">
                   <p className="font-semibold text-slate-800">
-                    {ticket.approval_status === "rejected" ? "This request wasn't approved and is closed" : "This request is closed"}
+                    {ticket.approval_status === "rejected"
+                        ? "This request wasn't approved and is closed"
+                        : "This request is closed"}
                   </p>
                   <p className="mt-0.5 text-slate-600">
                     Need more help?{" "}
@@ -146,18 +222,23 @@ export default async function RequestPage({ params }: { params: Promise<{ number
             </Card>
           )}
 
-          <Card>
-            <CardHeader title={isRequester ? "What you told us" : "Request details"} description={`${ticket.creator && ticket.creator.id !== ticket.requester_id ? `Raised by ${ticket.creator.full_name ?? "an agent"} · ` : ""}${formatDateTime(ticket.created_at)}`} />
-            <CardBody className="space-y-4">
-              <Markdown source={ticket.description} className="prose-doc break-words text-sm text-slate-700" />
-              {ticketAttachments.length > 0 && (
-                <div>
-                  <p className="mb-2 text-xs font-medium text-slate-500">Attachments</p>
-                  <AttachmentList files={ticketAttachments} />
-                </div>
-              )}
-            </CardBody>
-          </Card>
+          {(!autoDescription || ticketAttachments.length > 0) && (
+            <Card>
+              <CardHeader
+                title={autoDescription ? "Attachments" : isRequester ? "What you told us" : "Request details"}
+                description={`${ticket.creator && ticket.creator.id !== ticket.requester_id ? `Raised by ${ticket.creator.full_name ?? "an agent"} · ` : !isRequester ? `From ${requesterName} · ` : ""}${formatDateTime(ticket.created_at)}`}
+              />
+              <CardBody className="space-y-4">
+                {!autoDescription && <Markdown source={ticket.description} className="prose-doc break-words text-sm text-slate-700" />}
+                {ticketAttachments.length > 0 && (
+                  <div>
+                    {!autoDescription && <p className="mb-2 text-xs font-medium text-slate-500">Attachments</p>}
+                    <AttachmentList files={ticketAttachments} />
+                  </div>
+                )}
+              </CardBody>
+            </Card>
+          )}
 
           {answers.length > 0 && (
             <Card>
@@ -178,10 +259,10 @@ export default async function RequestPage({ params }: { params: Promise<{ number
           )}
 
           <Card>
-            <CardHeader title="Conversation" description={isRequester ? "Replies from the support team and you, plus status changes." : undefined} />
+            <CardHeader title="Conversation" description={isRequester || isFollower ? "Replies from the support team and you, plus status changes." : undefined} />
             <CardBody className="space-y-5">
-              <Conversation items={timeline} requesterId={ticket.requester_id} audience="requester" />
-              {isRequester && ticket.status !== "closed" && (
+              <Conversation items={timeline} requesterId={ticket.requester_id} audience="requester" requesterSideIds={followers.map((f) => f.id)} />
+              {canReply && (
                 <div id="reply" className="scroll-mt-24">
                   <Composer
                     ticketId={ticket.id}
@@ -194,8 +275,19 @@ export default async function RequestPage({ params }: { params: Promise<{ number
         </div>
 
         <aside className="space-y-6">
-          <NextSteps ticket={ticket} approvals={approvals} isRequester={isRequester} reopenUntil={canReopen ? reopenUntil : null} />
+          <NextSteps ticket={ticket} approvals={approvals} isRequester={isRequester} reopenUntil={canReopen ? reopenUntil : null} mergedRef={mergedRef} />
           {approvals.length > 0 && <ApprovalsCard approvals={approvals} isRequester={isRequester} />}
+          {(followers.length > 0 || (isRequester && ticket.status !== "closed")) && (
+            <FollowersPanel
+              ticketId={ticket.id}
+              meId={me.id}
+              requesterId={ticket.requester_id}
+              requesterName={requesterName}
+              followers={followers}
+              canManage={isRequester}
+              canAdd={ticket.status !== "closed"}
+            />
+          )}
           <DetailsCard ticket={ticket} isRequester={isRequester} />
         </aside>
       </div>
@@ -244,14 +336,27 @@ function approverLabel(a: ApprovalView, isRequester: boolean) {
   return `${a.team?.name ?? "Team"} lead`;
 }
 
-function NextSteps({ ticket, approvals, isRequester, reopenUntil }: { ticket: TicketDetail; approvals: ApprovalView[]; isRequester: boolean; reopenUntil: Date | null }) {
+function NextSteps({
+  ticket,
+  approvals,
+  isRequester,
+  reopenUntil,
+  mergedRef,
+}: {
+  ticket: TicketDetail;
+  approvals: ApprovalView[];
+  isRequester: boolean;
+  reopenUntil: Date | null;
+  mergedRef: string | null;
+}) {
   const awaitingApproval = ticket.approval_status === "pending";
   const pendingApproval = approvals.find((a) => a.status === "pending");
   const you = isRequester ? "you" : "the requester";
   const team = ticket.team?.name ?? "The team";
 
   let summary: string;
-  if (awaitingApproval) summary = `Waiting for approval from ${pendingApproval ? approverLabel(pendingApproval, isRequester) : "an approver"}. Work starts once it's approved.`;
+  if (mergedRef) summary = `Merged into ${mergedRef}. Updates continue there.`;
+  else if (awaitingApproval) summary = `Waiting for approval from ${pendingApproval ? approverLabel(pendingApproval, isRequester) : "an approver"}. Work starts once it's approved.`;
   else if (ticket.status === "new") summary = `We've got it. ${team} will pick it up soon.`;
   else if (ticket.status === "open") summary = ticket.assignee ? `${ticket.assignee.full_name ?? "An agent"} is working on it.` : `${team} is looking into it.`;
   else if (ticket.status === "pending") summary = `The team is waiting for a reply from ${you}. The clock is paused until then.`;
