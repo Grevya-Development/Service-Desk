@@ -7,6 +7,8 @@ export const dynamic = "force-dynamic";
 export async function GET() {
   const started = Date.now();
   const { error } = await createAdminClient().from("teams").select("id", { head: true, count: "exact" });
-  const body = { ok: !error, database: error ? "unreachable" : "ok", latencyMs: Date.now() - started, time: new Date().toISOString() };
+  // On failure, say why in general terms (e.g. an invalid key) — never data or secrets.
+  const reason = error ? (/api key|jwt|apikey/i.test(error.message) ? "invalid service-role key" : error.code || "query failed") : undefined;
+  const body = { ok: !error, database: error ? "error" : "ok", reason, latencyMs: Date.now() - started, time: new Date().toISOString() };
   return NextResponse.json(body, { status: error ? 503 : 200, headers: { "cache-control": "no-store" } });
 }
