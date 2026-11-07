@@ -1,5 +1,6 @@
 import { createServerClient } from "@supabase/ssr";
 import { NextResponse, type NextRequest } from "next/server";
+import { env } from "@/lib/env";
 
 const PUBLIC_PATHS = ["/login", "/auth", "/api/cron", "/api/health"];
 
@@ -7,7 +8,7 @@ const REQUIRED_ENV = ["SUPABASE_URL", "SUPABASE_ANON_KEY", "SUPABASE_SERVICE_ROL
 
 /** Plain-text page naming missing settings (never their values) instead of a bare 500. */
 function missingConfig() {
-  const missing = REQUIRED_ENV.filter((k) => !process.env[k]);
+  const missing = REQUIRED_ENV.filter((k) => !(process.env[k] ?? "").trim());
   if (!missing.length) return null;
   return new NextResponse(
     `Service Desk is not configured yet.\n\nMissing environment variable(s): ${missing.join(", ")}\n\n` +
@@ -23,8 +24,8 @@ export async function proxy(request: NextRequest) {
   let response = NextResponse.next({ request });
 
   const supabase = createServerClient(
-    process.env.SUPABASE_URL!,
-    process.env.SUPABASE_ANON_KEY!,
+    env.supabaseUrl,
+    env.supabaseAnonKey,
     {
       cookies: {
         getAll() {

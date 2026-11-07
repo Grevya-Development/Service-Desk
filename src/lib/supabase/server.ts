@@ -1,6 +1,7 @@
 import { createServerClient } from "@supabase/ssr";
 import { cookies } from "next/headers";
 import type { Database } from "@/lib/database.types";
+import { env } from "@/lib/env";
 
 /**
  * Supabase client bound to the signed-in user's session (RLS applies).
@@ -9,8 +10,8 @@ import type { Database } from "@/lib/database.types";
 export async function createClient() {
   const cookieStore = await cookies();
   return createServerClient<Database, "servicedesk">(
-    process.env.SUPABASE_URL!,
-    process.env.SUPABASE_ANON_KEY!,
+    env.supabaseUrl,
+    env.supabaseAnonKey,
     {
       db: { schema: "servicedesk" },
       cookies: {
