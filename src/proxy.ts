@@ -3,7 +3,23 @@ import { NextResponse, type NextRequest } from "next/server";
 
 const PUBLIC_PATHS = ["/login", "/auth", "/api/cron"];
 
+const REQUIRED_ENV = ["SUPABASE_URL", "SUPABASE_ANON_KEY", "SUPABASE_SERVICE_ROLE_KEY"] as const;
+
+/** Plain-text page naming missing settings (never their values) instead of a bare 500. */
+function missingConfig() {
+  const missing = REQUIRED_ENV.filter((k) => !process.env[k]);
+  if (!missing.length) return null;
+  return new NextResponse(
+    `Service Desk is not configured yet.\n\nMissing environment variable(s): ${missing.join(", ")}\n\n` +
+      "Add them in Vercel → Project → Settings → Environment Variables (Production), then redeploy.\n",
+    { status: 503, headers: { "content-type": "text/plain; charset=utf-8", "cache-control": "no-store" } },
+  );
+}
+
 export async function proxy(request: NextRequest) {
+  const misconfigured = missingConfig();
+  if (misconfigured) return misconfigured;
+
   let response = NextResponse.next({ request });
 
   const supabase = createServerClient(
