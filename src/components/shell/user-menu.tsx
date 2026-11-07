@@ -1,14 +1,16 @@
 "use client";
 
-import { useEffect, useRef, useState } from "react";
-import { ExternalLink, LogOut } from "lucide-react";
+import { useEffect, useRef, useState, useTransition } from "react";
+import { toast } from "sonner";
+import { ExternalLink, LogOut, Moon, Sun } from "lucide-react";
 import { Avatar } from "@/components/ui/avatar";
-import { signOut } from "@/app/(desk)/_actions";
+import { setAway, signOut } from "@/app/(desk)/_actions";
 
 export type ShellUser = { name: string; email: string; avatarUrl: string | null; designation: string | null; roleLabel: string };
 
-export function UserMenu({ user, peopleSuccessUrl }: { user: ShellUser; peopleSuccessUrl: string }) {
+export function UserMenu({ user, peopleSuccessUrl, isAgent, away }: { user: ShellUser; peopleSuccessUrl: string; isAgent: boolean; away: boolean }) {
   const [open, setOpen] = useState(false);
+  const [pending, startTransition] = useTransition();
   const ref = useRef<HTMLDivElement>(null);
   useEffect(() => {
     const onDoc = (e: MouseEvent) => !ref.current?.contains(e.target as Node) && setOpen(false);
@@ -18,7 +20,12 @@ export function UserMenu({ user, peopleSuccessUrl }: { user: ShellUser; peopleSu
   return (
     <div ref={ref} className="relative ml-1">
       <button type="button" onClick={() => setOpen((o) => !o)} aria-expanded={open} aria-label="Account menu" className="rounded-full">
-        <Avatar name={user.name} src={user.avatarUrl} size="sm" className="ring-slate-200" />
+        <span className="relative block">
+          <Avatar name={user.name} src={user.avatarUrl} size="sm" className="ring-slate-200" />
+          {isAgent && (
+            <span className={`absolute -bottom-0.5 -right-0.5 h-3 w-3 rounded-full ring-2 ring-white ${away ? "bg-amber-400" : "bg-emerald-500"}`} title={away ? "Away" : "Available"} />
+          )}
+        </span>
       </button>
       {open && (
         <div className="absolute right-0 top-11 z-[60] w-64 overflow-hidden rounded-xl border border-slate-200 bg-white shadow-xl">
@@ -27,6 +34,24 @@ export function UserMenu({ user, peopleSuccessUrl }: { user: ShellUser; peopleSu
             <p className="truncate text-xs text-slate-500">{user.email}</p>
             <p className="mt-1 text-[11px] font-medium text-primary-600">{user.roleLabel}</p>
           </div>
+          {isAgent && (
+            <button
+              type="button"
+              disabled={pending}
+              onClick={() =>
+                startTransition(async () => {
+                  const res = await setAway(!away);
+                  if (res.ok) toast.success(away ? "You're available. New tickets can be assigned to you." : "You're away. Auto-assign will skip you.");
+                  else toast.error(res.error);
+                })
+              }
+              className="flex w-full items-center gap-2 border-b border-slate-100 px-4 py-2.5 text-left text-sm text-slate-700 hover:bg-slate-50 disabled:opacity-60"
+            >
+              {away ? <Sun className="h-4 w-4 text-emerald-600" /> : <Moon className="h-4 w-4 text-amber-500" />}
+              <span className="flex-1">{away ? "Set yourself available" : "Set yourself away"}</span>
+              <span className={`rounded-full px-2 py-0.5 text-[11px] font-medium ${away ? "bg-amber-50 text-amber-700" : "bg-emerald-50 text-emerald-700"}`}>{away ? "Away" : "Available"}</span>
+            </button>
+          )}
           <a href={peopleSuccessUrl} className="flex items-center gap-2 px-4 py-2.5 text-sm text-slate-700 hover:bg-slate-50">
             <ExternalLink className="h-4 w-4 text-slate-400" /> Open People Success
           </a>

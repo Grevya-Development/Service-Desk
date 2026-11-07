@@ -5,6 +5,7 @@ import Link from "next/link";
 import { usePathname } from "next/navigation";
 import { useState, type ReactNode } from "react";
 import {
+  Activity,
   BarChart3,
   BookOpen,
   BookOpenCheck,
@@ -16,6 +17,8 @@ import {
   Home,
   Inbox,
   LayoutGrid,
+  MessageSquareText,
+  Siren,
   Laptop,
   Menu,
   PlusCircle,
@@ -50,6 +53,9 @@ const ICONS: Record<NavIcon, LucideIcon> = {
   sla: Timer,
   "catalog-admin": LayoutGrid,
   settings: Cog,
+  status: Activity,
+  incidents: Siren,
+  templates: MessageSquareText,
 };
 
 function isActive(pathname: string, href: string, exact?: boolean) {
@@ -103,6 +109,7 @@ export function DeskShell({
   notifications,
   unread,
   isAgent,
+  away,
   peopleSuccessUrl,
   children,
 }: {
@@ -111,6 +118,7 @@ export function DeskShell({
   notifications: NotificationItem[];
   unread: number;
   isAgent: boolean;
+  away: boolean;
   peopleSuccessUrl: string;
   children: ReactNode;
 }) {
@@ -141,7 +149,7 @@ export function DeskShell({
         </div>
         <div className="flex shrink-0 items-center gap-1">
           <NotificationsMenu items={notifications} unread={unread} />
-          <UserMenu user={user} peopleSuccessUrl={peopleSuccessUrl} />
+          <UserMenu user={user} peopleSuccessUrl={peopleSuccessUrl} isAgent={isAgent} away={away} />
         </div>
       </header>
 

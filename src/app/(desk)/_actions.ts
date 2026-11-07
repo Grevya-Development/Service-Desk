@@ -24,6 +24,17 @@ export async function markAllNotificationsRead() {
   revalidatePath("/", "layout");
 }
 
+/** Agents: mark yourself away (auto-assign skips you) or available again. */
+export async function setAway(away: boolean) {
+  const me = await getViewer();
+  if (!me || !me.isAgent) return { ok: false as const, error: "Only agents can set availability" };
+  const supabase = await createClient();
+  const { error } = await supabase.from("agent_profiles").upsert({ employee_id: me.id, away: Boolean(away), away_until: null });
+  if (error) return { ok: false as const, error: error.message };
+  revalidatePath("/", "layout");
+  return { ok: true as const };
+}
+
 export async function signOut() {
   const supabase = await createClient();
   await supabase.auth.signOut();

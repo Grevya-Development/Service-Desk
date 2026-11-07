@@ -64,3 +64,20 @@ Light canvas, white `rounded-xl` cards, slate greys, primary blue `primary-600`,
 - Do **not** run `next build` or start another dev server (one runs on :3200 against the local database). Do not touch the remote database.
 - You may query the **local** DB to check data shapes: `.env.local` has `SUPABASE_DB_URL` (postgres) and local Supabase keys. Put throwaway scripts in `.tmp/`.
 - Demo logins (password `Grevya@123`): `priya@` employee (manager `kavin@`), `manoj@` / `lakshmi@` IT agents, `arvind@` IT lead, `hr@` / `divya@` HR leads, `admin@` desk admin.
+
+## Round 2 additions (migration 0004)
+- **Incidents** (`incidents`, `incident_updates`, `incident_subscribers`; `tickets.incident_id`). Agents of the team insert/update incidents; posting an `incident_updates` row moves the incident's status and notifies subscribers + requesters of linked open tickets. Resolve with `rpc("resolve_incident", { p_id, p_message, p_resolve_tickets })` (returns number of tickets resolved). Employees subscribe with an `incident_subscribers` insert of their own id ("I'm affected / notify me").
+- **Followers / CC** (`ticket_followers`): requester or agent adds; follower or requester/agent removes. Followers can view the ticket, reply publicly, and get public updates. Max 20 per ticket. Helper `is_ticket_follower(ticket)`.
+- **Merge duplicates**: `rpc("merge_tickets", { p_source, p_target })` closes the source, sets `merged_into`, posts notes and makes the source requester a follower of the target.
+- **Reply templates** (`canned_responses`: team_id, title, body, use_count). Agents of the team CRUD them; call `rpc("record_canned_use", { p_id })` when one is inserted.
+- **Agent availability** (`agent_profiles`: employee_id, away, away_until). Auto-assign skips away agents. Toggle exists in the user menu (`setAway` in `src/app/(desk)/_actions.ts`).
+- **Pending follow-ups** (automatic, in `run_sla_checks`): reminder to the requester after `pending_reminder_days` working days, auto-resolve after `pending_auto_resolve_days` (settings rows, defaults 3 and 5).
+- New ticket event kinds: `follower`, `incident`, `merged`.
+- New routes in the nav: `/status` (everyone), `/desk/incidents`, `/desk/templates` (agents). `/api/health` is public.
+
+## Testing in a real browser (each engineer uses their own browser)
+Do NOT use the shared `browse` CLI. Write Playwright scripts in `.tmp/` that import
+`/Users/kavinnr/.claude/skills/gstack/node_modules/playwright/index.mjs` and launch your own `chromium` (headless).
+The dev server runs at http://localhost:3200 against the local database. Sign in by filling `input[name=email]`,
+`input[name=password]` (`Grevya@123`) and clicking `button[type=submit]`, then `waitForURL(/\/home/)`.
+Listen to `page.on("pageerror")` and console errors. Take screenshots with `page.screenshot({ path })` and look at them.

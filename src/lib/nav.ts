@@ -16,14 +16,17 @@ export type NavIcon =
   | "categories"
   | "sla"
   | "catalog-admin"
-  | "settings";
+  | "settings"
+  | "status"
+  | "incidents"
+  | "templates";
 
 export type NavItem = { label: string; href: string; icon: NavIcon; badge?: number; exact?: boolean };
 export type NavSection = { title: string; items: NavItem[] };
 
 export type NavViewer = { isAgent: boolean; isLead: boolean; isAdmin: boolean; managesAssets: boolean; showApprovals: boolean };
 
-export function buildNav(v: NavViewer, counts: { approvals: number; unassigned: number }): NavSection[] {
+export function buildNav(v: NavViewer, counts: { approvals: number; unassigned: number; activeIncidents: number }): NavSection[] {
   const sections: NavSection[] = [
     {
       title: "Help center",
@@ -34,6 +37,7 @@ export function buildNav(v: NavViewer, counts: { approvals: number; unassigned: 
         { label: "My requests", href: "/requests", icon: "requests", exact: true },
         { label: "Knowledge base", href: "/kb", icon: "kb" },
         { label: "My assets", href: "/assets/mine", icon: "laptop" },
+        { label: "Service status", href: "/status", icon: "status", badge: counts.activeIncidents },
         ...(v.showApprovals || counts.approvals > 0 ? [{ label: "Approvals", href: "/approvals", icon: "approvals" as const, badge: counts.approvals }] : []),
       ],
     },
@@ -44,6 +48,8 @@ export function buildNav(v: NavViewer, counts: { approvals: number; unassigned: 
       items: [
         { label: "Ticket queue", href: "/desk", icon: "queue", badge: counts.unassigned, exact: true },
         { label: "New ticket", href: "/desk/new", icon: "ticket-plus" },
+        { label: "Incidents", href: "/desk/incidents", icon: "incidents", badge: counts.activeIncidents },
+        { label: "Reply templates", href: "/desk/templates", icon: "templates" },
         { label: "Manage articles", href: "/desk/kb", icon: "kb-edit" },
         ...(v.managesAssets ? [{ label: "Assets", href: "/desk/assets", icon: "assets" as const }] : []),
         { label: "Reports", href: "/desk/reports", icon: "reports" },

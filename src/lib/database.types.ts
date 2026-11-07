@@ -1387,7 +1387,27 @@ isOneToOne: false
           }
         },"servicedesk": {
           Tables: {
-            "approvals": {
+            "agent_profiles": {
+                  Row: {
+                    "away": boolean,"away_until": string | null,"employee_id": string,"updated_at": string
+                  }
+                  ComputedFields: never
+                  Insert: {
+                    "away"?: boolean,"away_until"?: string | null,"employee_id": string,"updated_at"?: string
+                  }
+                  Update: {
+                    "away"?: boolean,"away_until"?: string | null,"employee_id"?: string,"updated_at"?: string
+                  }
+                  Relationships: [
+                    {
+      foreignKeyName: "agent_profiles_employee_id_fkey"
+      columns: ["employee_id"]
+isOneToOne: true
+      referencedRelation: "people"
+      referencedColumns: ["id"]
+    }
+                  ]
+                },"approvals": {
                   Row: {
                     "approver_id": string | null,"comment": string | null,"created_at": string,"decided_at": string | null,"decided_by": string | null,"id": string,"kind": string,"status": string,"team_id": string | null,"ticket_id": string
                   }
@@ -1503,6 +1523,32 @@ isOneToOne: false
       referencedColumns: ["id"]
     }
                   ]
+                },"canned_responses": {
+                  Row: {
+                    "body": string,"created_at": string,"created_by": string | null,"id": string,"team_id": string,"title": string,"updated_at": string,"use_count": number
+                  }
+                  ComputedFields: never
+                  Insert: {
+                    "body": string,"created_at"?: string,"created_by"?: string | null,"id"?: string,"team_id": string,"title": string,"updated_at"?: string,"use_count"?: number
+                  }
+                  Update: {
+                    "body"?: string,"created_at"?: string,"created_by"?: string | null,"id"?: string,"team_id"?: string,"title"?: string,"updated_at"?: string,"use_count"?: number
+                  }
+                  Relationships: [
+                    {
+      foreignKeyName: "canned_responses_created_by_fkey"
+      columns: ["created_by"]
+isOneToOne: false
+      referencedRelation: "people"
+      referencedColumns: ["id"]
+    },{
+      foreignKeyName: "canned_responses_team_id_fkey"
+      columns: ["team_id"]
+isOneToOne: false
+      referencedRelation: "teams"
+      referencedColumns: ["id"]
+    }
+                  ]
                 },"catalog_items": {
                   Row: {
                     "active": boolean,"approval": string,"category_id": string | null,"created_at": string,"default_priority": string,"description": string | null,"expected_days": number | null,"fields": NonNullable<Json>,"icon": string,"id": string,"name": string,"sort_order": number,"team_id": string,"updated_at": string
@@ -1543,6 +1589,84 @@ isOneToOne: false
                   Relationships: [
                     {
       foreignKeyName: "categories_team_id_fkey"
+      columns: ["team_id"]
+isOneToOne: false
+      referencedRelation: "teams"
+      referencedColumns: ["id"]
+    }
+                  ]
+                },"incident_subscribers": {
+                  Row: {
+                    "created_at": string,"employee_id": string,"incident_id": string
+                  }
+                  ComputedFields: never
+                  Insert: {
+                    "created_at"?: string,"employee_id": string,"incident_id": string
+                  }
+                  Update: {
+                    "created_at"?: string,"employee_id"?: string,"incident_id"?: string
+                  }
+                  Relationships: [
+                    {
+      foreignKeyName: "incident_subscribers_employee_id_fkey"
+      columns: ["employee_id"]
+isOneToOne: false
+      referencedRelation: "people"
+      referencedColumns: ["id"]
+    },{
+      foreignKeyName: "incident_subscribers_incident_id_fkey"
+      columns: ["incident_id"]
+isOneToOne: false
+      referencedRelation: "incidents"
+      referencedColumns: ["id"]
+    }
+                  ]
+                },"incident_updates": {
+                  Row: {
+                    "author_id": string | null,"body": string,"created_at": string,"id": string,"incident_id": string,"status": string
+                  }
+                  ComputedFields: never
+                  Insert: {
+                    "author_id"?: string | null,"body": string,"created_at"?: string,"id"?: string,"incident_id": string,"status": string
+                  }
+                  Update: {
+                    "author_id"?: string | null,"body"?: string,"created_at"?: string,"id"?: string,"incident_id"?: string,"status"?: string
+                  }
+                  Relationships: [
+                    {
+      foreignKeyName: "incident_updates_author_id_fkey"
+      columns: ["author_id"]
+isOneToOne: false
+      referencedRelation: "people"
+      referencedColumns: ["id"]
+    },{
+      foreignKeyName: "incident_updates_incident_id_fkey"
+      columns: ["incident_id"]
+isOneToOne: false
+      referencedRelation: "incidents"
+      referencedColumns: ["id"]
+    }
+                  ]
+                },"incidents": {
+                  Row: {
+                    "created_at": string,"created_by": string | null,"id": string,"resolved_at": string | null,"severity": string,"started_at": string,"status": string,"summary": string,"team_id": string,"title": string,"updated_at": string
+                  }
+                  ComputedFields: never
+                  Insert: {
+                    "created_at"?: string,"created_by"?: string | null,"id"?: string,"resolved_at"?: string | null,"severity"?: string,"started_at"?: string,"status"?: string,"summary": string,"team_id": string,"title": string,"updated_at"?: string
+                  }
+                  Update: {
+                    "created_at"?: string,"created_by"?: string | null,"id"?: string,"resolved_at"?: string | null,"severity"?: string,"started_at"?: string,"status"?: string,"summary"?: string,"team_id"?: string,"title"?: string,"updated_at"?: string
+                  }
+                  Relationships: [
+                    {
+      foreignKeyName: "incidents_created_by_fkey"
+      columns: ["created_by"]
+isOneToOne: false
+      referencedRelation: "people"
+      referencedColumns: ["id"]
+    },{
+      foreignKeyName: "incidents_team_id_fkey"
       columns: ["team_id"]
 isOneToOne: false
       referencedRelation: "teams"
@@ -1753,6 +1877,38 @@ isOneToOne: false
       referencedColumns: ["id"]
     }
                   ]
+                },"ticket_followers": {
+                  Row: {
+                    "added_by": string | null,"created_at": string,"employee_id": string,"ticket_id": string
+                  }
+                  ComputedFields: never
+                  Insert: {
+                    "added_by"?: string | null,"created_at"?: string,"employee_id": string,"ticket_id": string
+                  }
+                  Update: {
+                    "added_by"?: string | null,"created_at"?: string,"employee_id"?: string,"ticket_id"?: string
+                  }
+                  Relationships: [
+                    {
+      foreignKeyName: "ticket_followers_added_by_fkey"
+      columns: ["added_by"]
+isOneToOne: false
+      referencedRelation: "people"
+      referencedColumns: ["id"]
+    },{
+      foreignKeyName: "ticket_followers_employee_id_fkey"
+      columns: ["employee_id"]
+isOneToOne: false
+      referencedRelation: "people"
+      referencedColumns: ["id"]
+    },{
+      foreignKeyName: "ticket_followers_ticket_id_fkey"
+      columns: ["ticket_id"]
+isOneToOne: false
+      referencedRelation: "tickets"
+      referencedColumns: ["id"]
+    }
+                  ]
                 },"ticket_messages": {
                   Row: {
                     "author_id": string | null,"body": string,"created_at": string,"id": string,"internal": boolean,"ticket_id": string
@@ -1781,7 +1937,7 @@ isOneToOne: false
                   ]
                 },"tickets": {
                   Row: {
-                    "approval_status": string,"approved_at": string | null,"asset_id": string | null,"assignee_id": string | null,"catalog_item_id": string | null,"category_id": string | null,"closed_at": string | null,"created_at": string,"created_by": string | null,"csat_at": string | null,"csat_comment": string | null,"csat_rating": string | null,"description": string,"first_responded_at": string | null,"first_response_due": string | null,"form_data": Json | null,"id": string,"legacy_id": string | null,"legacy_ref": string | null,"number": number,"pending_since": string | null,"priority": string,"requester_id": string,"resolution_breached": boolean,"resolution_due": string | null,"resolution_warned": boolean,"resolved_at": string | null,"response_breached": boolean,"response_warned": boolean,"sla_paused_minutes": number,"source": string,"status": string,"subject": string,"team_id": string,"type": string,"updated_at": string,"compute_sla": {
+                    "approval_status": string,"approved_at": string | null,"asset_id": string | null,"assignee_id": string | null,"catalog_item_id": string | null,"category_id": string | null,"closed_at": string | null,"created_at": string,"created_by": string | null,"csat_at": string | null,"csat_comment": string | null,"csat_rating": string | null,"description": string,"first_responded_at": string | null,"first_response_due": string | null,"form_data": Json | null,"id": string,"incident_id": string | null,"legacy_id": string | null,"legacy_ref": string | null,"merged_into": string | null,"number": number,"pending_reminded_at": string | null,"pending_since": string | null,"priority": string,"requester_id": string,"resolution_breached": boolean,"resolution_due": string | null,"resolution_warned": boolean,"resolved_at": string | null,"response_breached": boolean,"response_warned": boolean,"sla_paused_minutes": number,"source": string,"status": string,"subject": string,"team_id": string,"type": string,"updated_at": string,"compute_sla": {
               "approval_status": string,
 "approved_at": string | null,
 "asset_id": string | null,
@@ -1799,9 +1955,12 @@ isOneToOne: false
 "first_response_due": string | null,
 "form_data": Json | null,
 "id": string,
+"incident_id": string | null,
 "legacy_id": string | null,
 "legacy_ref": string | null,
+"merged_into": string | null,
 "number": number,
+"pending_reminded_at": string | null,
 "pending_since": string | null,
 "priority": string,
 "requester_id": string,
@@ -1822,10 +1981,10 @@ isOneToOne: false
                   }
                   ComputedFields: "compute_sla"
                   Insert: {
-                    "approval_status"?: string,"approved_at"?: string | null,"asset_id"?: string | null,"assignee_id"?: string | null,"catalog_item_id"?: string | null,"category_id"?: string | null,"closed_at"?: string | null,"created_at"?: string,"created_by"?: string | null,"csat_at"?: string | null,"csat_comment"?: string | null,"csat_rating"?: string | null,"description": string,"first_responded_at"?: string | null,"first_response_due"?: string | null,"form_data"?: Json | null,"id"?: string,"legacy_id"?: string | null,"legacy_ref"?: string | null,"number"?: never,"pending_since"?: string | null,"priority"?: string,"requester_id": string,"resolution_breached"?: boolean,"resolution_due"?: string | null,"resolution_warned"?: boolean,"resolved_at"?: string | null,"response_breached"?: boolean,"response_warned"?: boolean,"sla_paused_minutes"?: number,"source"?: string,"status"?: string,"subject": string,"team_id": string,"type"?: string,"updated_at"?: string
+                    "approval_status"?: string,"approved_at"?: string | null,"asset_id"?: string | null,"assignee_id"?: string | null,"catalog_item_id"?: string | null,"category_id"?: string | null,"closed_at"?: string | null,"created_at"?: string,"created_by"?: string | null,"csat_at"?: string | null,"csat_comment"?: string | null,"csat_rating"?: string | null,"description": string,"first_responded_at"?: string | null,"first_response_due"?: string | null,"form_data"?: Json | null,"id"?: string,"incident_id"?: string | null,"legacy_id"?: string | null,"legacy_ref"?: string | null,"merged_into"?: string | null,"number"?: never,"pending_reminded_at"?: string | null,"pending_since"?: string | null,"priority"?: string,"requester_id": string,"resolution_breached"?: boolean,"resolution_due"?: string | null,"resolution_warned"?: boolean,"resolved_at"?: string | null,"response_breached"?: boolean,"response_warned"?: boolean,"sla_paused_minutes"?: number,"source"?: string,"status"?: string,"subject": string,"team_id": string,"type"?: string,"updated_at"?: string
                   }
                   Update: {
-                    "approval_status"?: string,"approved_at"?: string | null,"asset_id"?: string | null,"assignee_id"?: string | null,"catalog_item_id"?: string | null,"category_id"?: string | null,"closed_at"?: string | null,"created_at"?: string,"created_by"?: string | null,"csat_at"?: string | null,"csat_comment"?: string | null,"csat_rating"?: string | null,"description"?: string,"first_responded_at"?: string | null,"first_response_due"?: string | null,"form_data"?: Json | null,"id"?: string,"legacy_id"?: string | null,"legacy_ref"?: string | null,"number"?: never,"pending_since"?: string | null,"priority"?: string,"requester_id"?: string,"resolution_breached"?: boolean,"resolution_due"?: string | null,"resolution_warned"?: boolean,"resolved_at"?: string | null,"response_breached"?: boolean,"response_warned"?: boolean,"sla_paused_minutes"?: number,"source"?: string,"status"?: string,"subject"?: string,"team_id"?: string,"type"?: string,"updated_at"?: string
+                    "approval_status"?: string,"approved_at"?: string | null,"asset_id"?: string | null,"assignee_id"?: string | null,"catalog_item_id"?: string | null,"category_id"?: string | null,"closed_at"?: string | null,"created_at"?: string,"created_by"?: string | null,"csat_at"?: string | null,"csat_comment"?: string | null,"csat_rating"?: string | null,"description"?: string,"first_responded_at"?: string | null,"first_response_due"?: string | null,"form_data"?: Json | null,"id"?: string,"incident_id"?: string | null,"legacy_id"?: string | null,"legacy_ref"?: string | null,"merged_into"?: string | null,"number"?: never,"pending_reminded_at"?: string | null,"pending_since"?: string | null,"priority"?: string,"requester_id"?: string,"resolution_breached"?: boolean,"resolution_due"?: string | null,"resolution_warned"?: boolean,"resolved_at"?: string | null,"response_breached"?: boolean,"response_warned"?: boolean,"sla_paused_minutes"?: number,"source"?: string,"status"?: string,"subject"?: string,"team_id"?: string,"type"?: string,"updated_at"?: string
                   }
                   Relationships: [
                     {
@@ -1857,6 +2016,18 @@ isOneToOne: false
       columns: ["created_by"]
 isOneToOne: false
       referencedRelation: "people"
+      referencedColumns: ["id"]
+    },{
+      foreignKeyName: "tickets_incident_id_fkey"
+      columns: ["incident_id"]
+isOneToOne: false
+      referencedRelation: "incidents"
+      referencedColumns: ["id"]
+    },{
+      foreignKeyName: "tickets_merged_into_fkey"
+      columns: ["merged_into"]
+isOneToOne: false
+      referencedRelation: "tickets"
       referencedColumns: ["id"]
     },{
       foreignKeyName: "tickets_requester_id_fkey"
@@ -1926,9 +2097,12 @@ isOneToOne: false
 "first_response_due": string | null,
 "form_data": Json | null,
 "id": string,
+"incident_id": string | null,
 "legacy_id": string | null,
 "legacy_ref": string | null,
+"merged_into": string | null,
 "number": number,
+"pending_reminded_at": string | null,
 "pending_since": string | null,
 "priority": string,
 "requester_id": string,
@@ -1973,13 +2147,22 @@ isOneToOne: false
 "is_approver_for":
 { Args: { "p_ticket": string }; Returns: boolean
                            },
+"is_away":
+{ Args: { "p_emp": string }; Returns: boolean
+                           },
 "is_holiday":
 { Args: { "p_day": string }; Returns: boolean
                            },
 "is_lead":
 { Args: { "p_team": string }; Returns: boolean
                            },
+"is_team_member":
+{ Args: { "p_emp": string,"p_team": string }; Returns: boolean
+                           },
 "is_ticket_agent":
+{ Args: { "p_ticket": string }; Returns: boolean
+                           },
+"is_ticket_follower":
 { Args: { "p_ticket": string }; Returns: boolean
                            },
 "is_ticket_requester":
@@ -1994,8 +2177,14 @@ isOneToOne: false
 "me":
 { Args: Record<PropertyKey, never>; Returns: string
                            },
+"merge_tickets":
+{ Args: { "p_source": string,"p_target": string }; Returns: undefined
+                           },
 "notify":
 { Args: { "p_body": string,"p_emp": string,"p_link": string,"p_mirror"?: boolean,"p_ticket": string,"p_title": string }; Returns: undefined
+                           },
+"notify_followers":
+{ Args: { "p_body": string,"p_link": string,"p_skip"?: string,"p_ticket": string,"p_title": string }; Returns: undefined
                            },
 "notify_leads":
 { Args: { "p_body": string,"p_link": string,"p_team": string,"p_ticket": string,"p_title": string }; Returns: undefined
@@ -2006,8 +2195,14 @@ isOneToOne: false
 "record_article_view":
 { Args: { "p_id": string }; Returns: undefined
                            },
+"record_canned_use":
+{ Args: { "p_id": string }; Returns: undefined
+                           },
 "ref":
 { Args: { "p_number": number }; Returns: string
+                           },
+"resolve_incident":
+{ Args: { "p_id": string,"p_message": string,"p_resolve_tickets"?: boolean }; Returns: number
                            },
 "run_sla_checks":
 { Args: Record<PropertyKey, never>; Returns: number

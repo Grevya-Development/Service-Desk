@@ -176,4 +176,67 @@ describe.skipIf(!enabled)("servicedesk database", () => {
       expect(after).toEqual({ status: "closed", approval_status: "rejected" });
     });
   });
+
+  describe("followers, merge, incidents, availability", () => {
+    it("lets followers view and reply, and keeps them out of the first-response stamp", async () => {
+      const t = await raise(priya, "it");
+      const { error } = await priya.from("ticket_followers").insert({ ticket_id: t.id, employee_id: ids.kavin });
+      expect(error).toBeNull();
+      const { data: seen } = await kavin.from("tickets").select("id").eq("id", t.id);
+      expect(seen).toHaveLength(1);
+      const { error: replyErr } = await kavin.from("ticket_messages").insert({ ticket_id: t.id, body: "Adding context as her manager" });
+      expect(replyErr).toBeNull();
+      const { data: after } = await admin.from("tickets").select("first_responded_at").eq("id", t.id).single();
+      expect(after?.first_responded_at).toBeNull();
+      const { error: noteErr } = await kavin.from("ticket_messages").insert({ ticket_id: t.id, body: "x", internal: true });
+      expect(noteErr).toBeTruthy();
+    });
+
+    it("merges a duplicate: closes it, links it and adds its requester as a follower", async () => {
+      const target = await raise(priya, "it");
+      const { data: src } = await admin
+        .from("tickets")
+        .insert({ team_id: teams.it, requester_id: ids.kavin, subject: "Same VPN issue", description: "dup", priority: "medium" })
+        .select("id")
+        .single();
+      created.push(src!.id);
+      const { error } = await manoj.rpc("merge_tickets", { p_source: src!.id, p_target: target.id });
+      expect(error).toBeNull();
+      const { data: s } = await admin.from("tickets").select("status, merged_into").eq("id", src!.id).single();
+      expect(s).toEqual({ status: "closed", merged_into: target.id });
+      const { data: f } = await admin.from("ticket_followers").select("employee_id").eq("ticket_id", target.id);
+      expect((f ?? []).map((x) => x.employee_id)).toContain(ids.kavin);
+    });
+
+    it("resolves an incident and every linked open ticket in one step", async () => {
+      const { data: inc, error } = await manoj.from("incidents").insert({ team_id: teams.it, title: "VPN outage (test)", summary: "VPN is down for everyone" }).select("id").single();
+      expect(error).toBeNull();
+      const t = await raise(priya, "it");
+      await manoj.from("tickets").update({ incident_id: inc!.id }).eq("id", t.id);
+      const { data: n, error: rErr } = await manoj.rpc("resolve_incident", { p_id: inc!.id, p_message: "VPN gateway restarted", p_resolve_tickets: true });
+      expect(rErr).toBeNull();
+      expect(n).toBe(1);
+      const { data: after } = await admin.from("tickets").select("status").eq("id", t.id).single();
+      expect(after?.status).toBe("resolved");
+      const { data: i } = await admin.from("incidents").select("status, resolved_at").eq("id", inc!.id).single();
+      expect(i?.status).toBe("resolved");
+      expect(i?.resolved_at).toBeTruthy();
+      await admin.from("incidents").delete().eq("id", inc!.id);
+    });
+
+    it("stops employees from opening incidents", async () => {
+      const { error } = await priya.from("incidents").insert({ team_id: teams.it, title: "Not allowed", summary: "nope" });
+      expect(error).toBeTruthy();
+    });
+
+    it("skips away agents when auto-assigning", async () => {
+      await admin.from("agent_profiles").upsert([{ employee_id: ids.manoj, away: true }, { employee_id: ids.lakshmi, away: true }]);
+      try {
+        const t = await raise(priya, "it");
+        expect([ids.manoj, ids.lakshmi]).not.toContain(t.assignee_id);
+      } finally {
+        await admin.from("agent_profiles").delete().in("employee_id", [ids.manoj, ids.lakshmi]);
+      }
+    });
+  });
 });
