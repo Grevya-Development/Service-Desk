@@ -14,7 +14,7 @@ export async function GET(request: NextRequest) {
   const tokenHash = searchParams.get("token_hash");
   const type = searchParams.get("type") as EmailOtpType | null;
   const next = searchParams.get("next") ?? (type === "recovery" || type === "invite" ? "/auth/reset" : "/home");
-  const safeNext = next.startsWith("/") && !next.startsWith("//") ? next : "/home";
+  const safeNext = next.startsWith("/") && !/^\/[\\/]/.test(next) ? next : "/home";
 
   if (tokenHash && type && TYPES.includes(type)) {
     const supabase = await createClient();

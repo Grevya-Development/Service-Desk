@@ -5,7 +5,7 @@ export async function GET(request: NextRequest) {
   const { searchParams, origin } = request.nextUrl;
   const code = searchParams.get("code");
   const next = searchParams.get("next") ?? "/home";
-  const safeNext = next.startsWith("/") && !next.startsWith("//") ? next : "/home";
+  const safeNext = next.startsWith("/") && !/^\/[\\/]/.test(next) ? next : "/home";
   if (code) {
     const supabase = await createClient();
     const { error } = await supabase.auth.exchangeCodeForSession(code);

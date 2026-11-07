@@ -50,7 +50,9 @@ export async function proxy(request: NextRequest) {
   if (!user && !isPublic) {
     const url = request.nextUrl.clone();
     url.pathname = "/login";
-    url.search = path && path !== "/" ? `?next=${encodeURIComponent(path)}` : "";
+    // Keep the query string too (e.g. /requests/new?team=it) so deep links survive sign-in.
+    const target = path + request.nextUrl.search;
+    url.search = path && path !== "/" ? `?next=${encodeURIComponent(target)}` : "";
     return NextResponse.redirect(url);
   }
   if (user && path === "/login") {

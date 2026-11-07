@@ -13,7 +13,7 @@ export async function signIn(_prev: ActionState, fd: FormData): Promise<ActionSt
   const supabase = await createClient();
   const { error } = await supabase.auth.signInWithPassword({ email, password });
   if (error) return fail(error.message === "Invalid login credentials" ? "Incorrect email or password" : error.message);
-  const safeNext = next && next.startsWith("/") && !next.startsWith("//") ? next : "/home";
+  const safeNext = next && next.startsWith("/") && !/^\/[\\/]/.test(next) ? next : "/home";
   return ok("Welcome back!", safeNext);
 }
 

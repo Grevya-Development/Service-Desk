@@ -7,6 +7,9 @@ read help articles and see their assigned devices.
 - **Help center** (everyone): report an issue, service catalog, my requests, knowledge base, my assets, approvals.
 - **Agent workspace**: ticket queue with SLA timers, ticket workspace (replies, internal notes, assignment, transfers), raise tickets on behalf of people, article management, asset register, reports.
 - **Administration** (team leads / desk admins): teams and agents, categories, SLA targets, service catalog builder, business hours, HR helpdesk import.
+- **Service status**: agents declare incidents ("Email is down — we're on it"); everyone sees a banner, can tap "I'm affected", and gets one notification when it's fixed. Resolving an incident can resolve every linked ticket at once.
+- **Less typing for agents**: reply templates with placeholders, article links, bulk actions, merge duplicates, keyboard shortcuts (`?`), CSV exports, paste/drag-drop screenshots.
+- **Followers / CC** on requests, **away status** (auto-assign skips you), automatic **reminders** and auto-resolve for tickets waiting on the requester.
 
 Design: [`docs/spec.md`](docs/spec.md). Code conventions: [`docs/CONVENTIONS.md`](docs/CONVENTIONS.md).
 
@@ -36,7 +39,9 @@ npm run dev                              # http://localhost:3200
 
 Demo logins (password `Grevya@123`): `priya@grevya.com` employee · `kavin@` manager/approver · `manoj@`, `lakshmi@` IT agents · `arvind@` IT lead · `hr@` HR lead · `divya@` HR agent · `admin@` desk admin.
 
-Checks: `npm run typecheck`, `npm run lint`, `npm test` (database tests run when `.env.local` points at the local stack).
+Checks: `npm run typecheck`, `npm run lint`, `npm test` (unit + database tests; database tests run when `.env.local` points at the local stack), `npm run test:e2e` (Playwright end-to-end journeys against the local stack; reseeds demo data first).
+
+Health check: `GET /api/health` → `{ ok, database, latencyMs }` (public, no data).
 
 ## Deploying
 

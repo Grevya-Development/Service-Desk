@@ -41,6 +41,9 @@ try {
   await sql.begin(async (tx) => {
     // ---- reset desk demo data -------------------------------------------
     await tx`delete from servicedesk.notifications`;
+    await tx`delete from servicedesk.incidents`;
+    await tx`delete from servicedesk.canned_responses`;
+    await tx`delete from servicedesk.agent_profiles`;
     await tx`delete from servicedesk.tickets`;
     await tx`delete from servicedesk.kb_articles`;
     await tx`delete from servicedesk.catalog_items`;
@@ -277,6 +280,31 @@ try {
     await ticket({ team: "hr", category: "Policies", requester: "fatima", assignee: "hr", priority: "low", status: "pending", at: ago(3, 15, 0), pendingAfter: 300,
       subject: "Can interns join the health insurance plan?", description: "Is there a way for interns to opt into the group health insurance?",
       messages: [{ by: "hr", after: 280, body: "Interns can opt in at a subsidised premium. Would you like to cover dependants too?" }] });
+
+    // ---- reply templates ---------------------------------------------------
+    const templates = [
+      ["it", "Need more details", "Hi {{first_name}}, thanks for raising {{ticket}}. Could you share a screenshot of the error and when it started? That helps us fix it faster.\n\n{{agent_name}}"],
+      ["it", "Restart and try again", "Hi {{first_name}}, please restart your laptop and try again. If it still happens, reply here and we'll take a closer look.\n\n{{agent_name}}"],
+      ["it", "Fixed — please confirm", "Hi {{first_name}}, we've fixed this. Could you check and confirm it works for you? If not, just reply and we'll reopen it.\n\n{{agent_name}}"],
+      ["hr", "Letter is ready", "Hi {{first_name}}, your letter for {{ticket}} is ready. Download it from People Success → Letters, or collect the signed copy from the HR desk.\n\n{{agent_name}}"],
+      ["hr", "Checking with payroll", "Hi {{first_name}}, thanks — we're checking this with payroll and will update {{ticket}} within two working days.\n\n{{agent_name}}"],
+    ];
+    for (const [team, title, body] of templates) {
+      await tx`insert into servicedesk.canned_responses (team_id, title, body, created_by) values (${teams[team]}, ${title}, ${body}, ${team === "it" ? emp.arvind : emp.hr})`;
+    }
+
+    // ---- an active incident with a linked ticket and an affected employee -----
+    const [inc] = await tx`insert into servicedesk.incidents (team_id, title, summary, status, severity, created_by, started_at)
+      values (${teams.it}, ${"VPN drops for some people working from home"}, ${"Some people on GlobalProtect 6.1.4 are being disconnected every few minutes. We're rolling out a fix — no need to raise a new ticket."}, ${"identified"}, ${"minor"}, ${emp.manoj}, ${ago(0, 10, 0)}) returning id`;
+    await tx`insert into servicedesk.incident_updates (incident_id, status, body, author_id, created_at)
+      values (${inc.id}, ${"identified"}, ${"Cause found: a bug in GlobalProtect 6.1.4 on macOS 15. Version 6.2.1 is being pushed to affected laptops."}, ${emp.manoj}, ${ago(0, 11, 0)})`;
+    const vpn = tickets.find((t) => t.subject.startsWith("VPN disconnects"));
+    if (vpn) await tx`update servicedesk.tickets set incident_id = ${inc.id} where id = ${vpn.id}`;
+    await tx`insert into servicedesk.incident_subscribers (incident_id, employee_id) values (${inc.id}, ${emp.rahul})`;
+
+    // ---- a follower (manager CC'd on a payslip question) ----------------------
+    const payslip = tickets.find((t) => t.subject === "Payslip correction");
+    if (payslip) await tx`insert into servicedesk.ticket_followers (ticket_id, employee_id, added_by) values (${payslip.id}, ${emp.kavin}, ${emp.priya})`;
   });
 
   // ---- realistic first-response stamps and SLA state ------------------------

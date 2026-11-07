@@ -90,3 +90,16 @@ Admin (leads / admins): `/admin/teams`, `/admin/categories`, `/admin/sla`, `/adm
 - Vitest: TypeScript helpers (formatting, markdown, report aggregation) and database tests against the local Supabase stack (business-hour maths, SLA triggers, RLS for requester vs agent vs other team).
 - Browser QA of the main flows with the demo accounts.
 - CI: typecheck, lint, unit tests, build.
+
+
+## Round 2 (2026-11-07)
+
+- **Incidents / service status** — `incidents`, `incident_updates`, `incident_subscribers`, `tickets.incident_id`; `/status` for everyone, `/desk/incidents` for agents, banner on Home / Report an issue / Catalog. `resolve_incident()` resolves linked tickets first, then posts the update, so each person gets one notification.
+- **Followers / CC** — `ticket_followers`; followers can view, reply and get public updates (not close/reopen/rate).
+- **Merge duplicates** — `merge_tickets()`; source closed with `merged_into`, its requester follows the target.
+- **Transfers** — `transfer_ticket()` (RLS also checks the updated row, so moving a ticket out of your own teams needs this function).
+- **Reply templates** — `canned_responses` with `{{first_name}}`, `{{ticket}}`, `{{agent_name}}`.
+- **Agent availability** — `agent_profiles.away`; auto-assign skips away agents.
+- **Pending follow-ups** — reminder after `pending_reminder_days` working days, auto-resolve after `pending_auto_resolve_days`; working-day length comes from business hours.
+- **Notification hygiene** — messages written by the system don't notify on their own; the status change does.
+- **Hardening** — security headers, `/api/health`, missing-configuration page, settings validation in the database.

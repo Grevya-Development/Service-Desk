@@ -43,3 +43,8 @@ next-env.d.ts
 !.env.example
 .gstack/
 .tmp/
+
+# playwright
+/playwright-report/
+/test-results/
+/tests/e2e/.auth/

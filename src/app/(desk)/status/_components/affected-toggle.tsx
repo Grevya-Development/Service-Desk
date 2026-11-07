@@ -1,6 +1,6 @@
 "use client";
 
-import { useOptimistic, useTransition } from "react";
+import { useState, useTransition } from "react";
 import { toast } from "sonner";
 import { BellRing, Check, Loader2 } from "lucide-react";
 import { cn } from "@/lib/utils";
@@ -9,18 +9,33 @@ import { setAffected } from "../actions";
 /** "I'm affected — notify me when it's fixed" switch. */
 export function AffectedToggle({ incidentId, subscribed }: { incidentId: string; subscribed: boolean }) {
   const [pending, startTransition] = useTransition();
-  const [on, setOn] = useOptimistic(subscribed);
+  // Plain state (not useOptimistic): an optimistic value snaps back to the old prop the moment the
+  // action finishes if the refreshed page hasn't arrived yet. Revert only when saving fails.
+  const [on, setOn] = useState(subscribed);
+  const [prevProp, setPrevProp] = useState(subscribed);
+  if (prevProp !== subscribed) {
+    setPrevProp(subscribed);
+    setOn(subscribed);
+  }
 
   const toggle = () => {
     const next = !on;
+    setOn(next);
     startTransition(async () => {
-      setOn(next);
       const fd = new FormData();
       fd.set("incident_id", incidentId);
       fd.set("on", next ? "1" : "0");
-      const res = await setAffected(null, fd);
+      let res;
+      try {
+        res = await setAffected(null, fd);
+      } catch {
+        res = { ok: false as const, error: "Something went wrong. Please try again." };
+      }
       if (res?.ok) toast.success(res.message ?? "Saved");
-      else toast.error(res?.error ?? "Something went wrong. Please try again.");
+      else {
+        setOn(!next);
+        toast.error(res?.error ?? "Something went wrong. Please try again.");
+      }
     });
   };
 
