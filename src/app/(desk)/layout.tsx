@@ -16,7 +16,7 @@ export default async function DeskLayout({ children }: LayoutProps<"/">) {
   const supabase = await createClient();
 
   const head = { count: "exact" as const, head: true };
-  const [notes, unread, myApprovals, leadApprovals, unassigned, reports, incidents, profile, teamIncidents] = await Promise.all([
+  const [notes, unread, myApprovals, leadApprovals, unassigned, reports, incidents, profile, teamIncidents, emailPref] = await Promise.all([
     supabase.from("notifications").select("id, title, body, link, read_at, created_at").eq("employee_id", me.id).order("created_at", { ascending: false }).limit(12),
     supabase.from("notifications").select("id", head).eq("employee_id", me.id).is("read_at", null),
     supabase.from("approvals").select("id", head).eq("status", "pending").eq("approver_id", me.id),
@@ -32,6 +32,7 @@ export default async function DeskLayout({ children }: LayoutProps<"/">) {
     me.agentTeamIds.length
       ? supabase.from("incidents").select("id", head).neq("status", "resolved").in("team_id", me.agentTeamIds)
       : Promise.resolve({ count: 0 }),
+    supabase.from("notification_preferences").select("email_enabled").eq("employee_id", me.id).maybeSingle(),
   ]);
 
   const approvals = (myApprovals.count ?? 0) + (leadApprovals.count ?? 0);
@@ -48,6 +49,7 @@ export default async function DeskLayout({ children }: LayoutProps<"/">) {
       unread={unread.count ?? 0}
       isAgent={me.isAgent}
       away={Boolean(profile.data?.away)}
+      emailEnabled={emailPref.data?.email_enabled ?? true}
       peopleSuccessUrl={process.env.PEOPLE_SUCCESS_URL || "https://peoplesuccess.vercel.app"}
     >
       {children}

@@ -2,7 +2,7 @@ import { createServerClient } from "@supabase/ssr";
 import { NextResponse, type NextRequest } from "next/server";
 import { env } from "@/lib/env";
 
-const PUBLIC_PATHS = ["/login", "/auth", "/api/cron", "/api/health"];
+const PUBLIC_PATHS = ["/login", "/auth", "/api/cron", "/api/health", "/api/email/dispatch"];
 
 const REQUIRED_ENV = ["SUPABASE_URL", "SUPABASE_ANON_KEY", "SUPABASE_SERVICE_ROLE_KEY"] as const;
 

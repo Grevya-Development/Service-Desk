@@ -325,6 +325,9 @@ try {
 
   const [{ count: imported }] = await sql`select servicedesk.import_hr_helpdesk() as count`;
   const [{ count: changed }] = await sql`select servicedesk.run_sla_checks() as count`;
+  // Demo notifications are never emailed. Locally, the database reaches the app on the host.
+  await sql`update servicedesk.notifications set email_status = 'skipped', email_error = 'Demo seed' where email_status = 'pending'`;
+  if (local) await sql`update servicedesk.settings set value = ${sql.json("http://host.docker.internal:3200/api/email/dispatch")} where key = 'email_dispatch_url'`;
   const [{ n }] = await sql`select count(*)::int as n from servicedesk.tickets`;
   console.log(`Seeded ${n} tickets (${imported} imported from the HR helpdesk), SLA checks touched ${changed}.`);
   console.log("Logins (password Grevya@123): priya@ employee · kavin@ manager/approver · manoj@ lakshmi@ IT agents · arvind@ IT lead · hr@ HR lead · divya@ HR agent · admin@ desk admin");

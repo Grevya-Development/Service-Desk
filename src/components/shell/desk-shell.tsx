@@ -110,6 +110,7 @@ export function DeskShell({
   unread,
   isAgent,
   away,
+  emailEnabled,
   peopleSuccessUrl,
   children,
 }: {
@@ -119,6 +120,7 @@ export function DeskShell({
   unread: number;
   isAgent: boolean;
   away: boolean;
+  emailEnabled: boolean;
   peopleSuccessUrl: string;
   children: ReactNode;
 }) {
@@ -149,7 +151,7 @@ export function DeskShell({
         </div>
         <div className="flex shrink-0 items-center gap-1">
           <NotificationsMenu items={notifications} unread={unread} />
-          <UserMenu user={user} peopleSuccessUrl={peopleSuccessUrl} isAgent={isAgent} away={away} />
+          <UserMenu user={user} peopleSuccessUrl={peopleSuccessUrl} isAgent={isAgent} away={away} emailEnabled={emailEnabled} />
         </div>
       </header>
 

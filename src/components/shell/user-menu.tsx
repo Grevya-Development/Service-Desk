@@ -2,13 +2,25 @@
 
 import { useEffect, useRef, useState, useTransition } from "react";
 import { toast } from "sonner";
-import { ExternalLink, LogOut, Moon, Sun } from "lucide-react";
+import { ExternalLink, LogOut, Mail, MailX, Moon, Sun } from "lucide-react";
 import { Avatar } from "@/components/ui/avatar";
-import { setAway, signOut } from "@/app/(desk)/_actions";
+import { setAway, setEmailNotifications, signOut } from "@/app/(desk)/_actions";
 
 export type ShellUser = { name: string; email: string; avatarUrl: string | null; designation: string | null; roleLabel: string };
 
-export function UserMenu({ user, peopleSuccessUrl, isAgent, away }: { user: ShellUser; peopleSuccessUrl: string; isAgent: boolean; away: boolean }) {
+export function UserMenu({
+  user,
+  peopleSuccessUrl,
+  isAgent,
+  away,
+  emailEnabled,
+}: {
+  user: ShellUser;
+  peopleSuccessUrl: string;
+  isAgent: boolean;
+  away: boolean;
+  emailEnabled: boolean;
+}) {
   const [open, setOpen] = useState(false);
   const [pending, startTransition] = useTransition();
   const ref = useRef<HTMLDivElement>(null);
@@ -52,6 +64,22 @@ export function UserMenu({ user, peopleSuccessUrl, isAgent, away }: { user: Shel
               <span className={`rounded-full px-2 py-0.5 text-[11px] font-medium ${away ? "bg-amber-50 text-amber-700" : "bg-emerald-50 text-emerald-700"}`}>{away ? "Away" : "Available"}</span>
             </button>
           )}
+          <button
+            type="button"
+            disabled={pending}
+            onClick={() =>
+              startTransition(async () => {
+                const res = await setEmailNotifications(!emailEnabled);
+                if (res.ok) toast.success(emailEnabled ? "Emails off. You'll still see updates in the bell." : "Emails on. We'll email you about updates.");
+                else toast.error(res.error);
+              })
+            }
+            className="flex w-full items-center gap-2 border-b border-slate-100 px-4 py-2.5 text-left text-sm text-slate-700 hover:bg-slate-50 disabled:opacity-60"
+          >
+            {emailEnabled ? <Mail className="h-4 w-4 text-primary-600" /> : <MailX className="h-4 w-4 text-slate-400" />}
+            <span className="flex-1">Email notifications</span>
+            <span className={`rounded-full px-2 py-0.5 text-[11px] font-medium ${emailEnabled ? "bg-primary-50 text-primary-700" : "bg-slate-100 text-slate-600"}`}>{emailEnabled ? "On" : "Off"}</span>
+          </button>
           <a href={peopleSuccessUrl} className="flex items-center gap-2 px-4 py-2.5 text-sm text-slate-700 hover:bg-slate-50">
             <ExternalLink className="h-4 w-4 text-slate-400" /> Open People Success
           </a>

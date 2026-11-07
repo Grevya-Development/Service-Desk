@@ -1,5 +1,6 @@
 import { NextResponse } from "next/server";
 import { createAdminClient } from "@/lib/supabase/admin";
+import { emailConfig } from "@/lib/email/config";
 
 export const dynamic = "force-dynamic";
 
@@ -15,6 +16,6 @@ export async function GET() {
       ? "SUPABASE_SERVICE_ROLE_KEY is not a valid key for this project"
       : text || `HTTP ${status}`;
   }
-  const body = { ok: !error, database: error ? "error" : "ok", status, reason, latencyMs: Date.now() - started, time: new Date().toISOString() };
+  const body = { ok: !error, database: error ? "error" : "ok", status, reason, email: emailConfig().configured ? "configured" : "not configured", latencyMs: Date.now() - started, time: new Date().toISOString() };
   return NextResponse.json(body, { status: error ? 503 : 200, headers: { "cache-control": "no-store" } });
 }

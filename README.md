@@ -54,5 +54,17 @@ Health check: `GET /api/health` → `{ ok, database, latencyMs }` (public, no da
 3. In the desk: **Administration → Settings** → set the App URL, add IT agents in **Teams & agents**, then **Import HR Helpdesk tickets**.
 4. In People Success (Vercel env): set `NEXT_PUBLIC_SERVICE_DESK_URL=<desk url>` and redeploy.
 5. Supabase Auth → URL configuration: add the desk URL to the redirect allow-list (password reset links).
+6. **Email** (Resend): verify your domain in Resend, then set `RESEND_API_KEY` and `EMAIL_FROM` in Vercel and redeploy.
+   In the desk: **Settings → Email notifications → Send me a test email**. Make sure **Settings → App URL** is set:
+   the database pings `<App URL>/api/email/dispatch` right after each notification (pg_net) and every minute (pg_cron).
+   For sign-in emails (password reset, invites) point Supabase **Auth → SMTP** at Resend too:
+   host `smtp.resend.com`, port `465`, user `resend`, password = the Resend API key, sender = the same verified address.
+
+## Email notifications
+
+Every in-app notification (approval needed, reply, resolved, assigned, overdue, incident updates, …) is queued on
+`servicedesk.notifications` and emailed through Resend in batches of up to 100, with idempotency keys, retries
+(1, 5, 15, 60 minutes; 5 attempts) and per-person opt-out (account menu → Email notifications). Notifications that
+existed before email was enabled are never sent. Outside production only `EMAIL_DEV_ALLOWLIST` recipients get mail.
 
 SLA checks run every 5 minutes via pg_cron when the extension is enabled, daily via Vercel Cron, and whenever an agent opens the queue.

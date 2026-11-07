@@ -1737,16 +1737,36 @@ isOneToOne: false
       referencedColumns: ["id"]
     }
                   ]
-                },"notifications": {
+                },"notification_preferences": {
                   Row: {
-                    "body": string | null,"created_at": string,"employee_id": string,"id": string,"link": string | null,"read_at": string | null,"ticket_id": string | null,"title": string
+                    "email_enabled": boolean,"employee_id": string,"updated_at": string
                   }
                   ComputedFields: never
                   Insert: {
-                    "body"?: string | null,"created_at"?: string,"employee_id": string,"id"?: string,"link"?: string | null,"read_at"?: string | null,"ticket_id"?: string | null,"title": string
+                    "email_enabled"?: boolean,"employee_id": string,"updated_at"?: string
                   }
                   Update: {
-                    "body"?: string | null,"created_at"?: string,"employee_id"?: string,"id"?: string,"link"?: string | null,"read_at"?: string | null,"ticket_id"?: string | null,"title"?: string
+                    "email_enabled"?: boolean,"employee_id"?: string,"updated_at"?: string
+                  }
+                  Relationships: [
+                    {
+      foreignKeyName: "notification_preferences_employee_id_fkey"
+      columns: ["employee_id"]
+isOneToOne: true
+      referencedRelation: "people"
+      referencedColumns: ["id"]
+    }
+                  ]
+                },"notifications": {
+                  Row: {
+                    "body": string | null,"created_at": string,"email_attempts": number,"email_claimed_at": string | null,"email_error": string | null,"email_id": string | null,"email_next_at": string,"email_sent_at": string | null,"email_status": string,"employee_id": string,"id": string,"link": string | null,"read_at": string | null,"ticket_id": string | null,"title": string
+                  }
+                  ComputedFields: never
+                  Insert: {
+                    "body"?: string | null,"created_at"?: string,"email_attempts"?: number,"email_claimed_at"?: string | null,"email_error"?: string | null,"email_id"?: string | null,"email_next_at"?: string,"email_sent_at"?: string | null,"email_status"?: string,"employee_id": string,"id"?: string,"link"?: string | null,"read_at"?: string | null,"ticket_id"?: string | null,"title": string
+                  }
+                  Update: {
+                    "body"?: string | null,"created_at"?: string,"email_attempts"?: number,"email_claimed_at"?: string | null,"email_error"?: string | null,"email_id"?: string | null,"email_next_at"?: string,"email_sent_at"?: string | null,"email_status"?: string,"employee_id"?: string,"id"?: string,"link"?: string | null,"read_at"?: string | null,"ticket_id"?: string | null,"title"?: string
                   }
                   Relationships: [
                     {
@@ -1762,6 +1782,20 @@ isOneToOne: false
       referencedRelation: "tickets"
       referencedColumns: ["id"]
     }
+                  ]
+                },"private_settings": {
+                  Row: {
+                    "key": string,"updated_at": string,"value": string
+                  }
+                  ComputedFields: never
+                  Insert: {
+                    "key": string,"updated_at"?: string,"value": string
+                  }
+                  Update: {
+                    "key"?: string,"updated_at"?: string,"value"?: string
+                  }
+                  Relationships: [
+                    
                   ]
                 },"schema_migrations": {
                   Row: {
@@ -2081,6 +2115,11 @@ isOneToOne: false
 "can_view_ticket":
 { Args: { "p_ticket": string }; Returns: boolean
                            },
+"claim_email_batch":
+{ Args: { "p_limit"?: number }; Returns: {
+              "attempts": number,"body": string,"created_at": string,"email": string,"employee_id": string,"full_name": string,"id": string,"link": string,"title": string
+            }[]
+                           },
 "compute_sla":
 { Args: { "t": Omit<Database["servicedesk"]['Tables']["tickets"]['Row'], Database["servicedesk"]['Tables']["tickets"]['ComputedFields']> }; Returns: {
               "approval_status": string,
@@ -2194,6 +2233,9 @@ isOneToOne: false
                            },
 "pick_assignee":
 { Args: { "p_team": string }; Returns: string
+                           },
+"ping_email_dispatch":
+{ Args: Record<PropertyKey, never>; Returns: undefined
                            },
 "record_article_view":
 { Args: { "p_id": string }; Returns: undefined

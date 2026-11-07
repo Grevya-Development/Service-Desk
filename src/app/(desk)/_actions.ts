@@ -35,6 +35,17 @@ export async function setAway(away: boolean) {
   return { ok: true as const };
 }
 
+/** Turn notification emails on or off for yourself. */
+export async function setEmailNotifications(enabled: boolean) {
+  const me = await getViewer();
+  if (!me) return { ok: false as const, error: "Not signed in" };
+  const supabase = await createClient();
+  const { error } = await supabase.from("notification_preferences").upsert({ employee_id: me.id, email_enabled: Boolean(enabled) });
+  if (error) return { ok: false as const, error: error.message };
+  revalidatePath("/", "layout");
+  return { ok: true as const };
+}
+
 export async function signOut() {
   const supabase = await createClient();
   await supabase.auth.signOut();

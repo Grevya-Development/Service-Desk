@@ -1,4 +1,4 @@
-import { BellRing, Clock, Database, Download, Gauge, Link2, TimerReset } from "lucide-react";
+import { BellRing, Clock, Database, Download, Gauge, Link2, Mail, Send, TimerReset } from "lucide-react";
 import { requireAdmin } from "@/lib/auth";
 import { createClient } from "@/lib/supabase/server";
 import { formatDateTime } from "@/lib/utils";
@@ -6,7 +6,9 @@ import { Card, CardBody, CardHeader, Field, Input, PageHeader, Select } from "@/
 import { ActionForm, SubmitButton } from "@/components/ui/action-form";
 import { ActionButton } from "@/components/ui/action-button";
 import { PENDING_LIMITS, TIMEZONES, WEEKDAYS } from "../_lib/validate";
-import { importHrHelpdesk, runSlaChecksNow, saveAppUrl, saveAutoClose, saveBusinessHours, savePendingFollowUp } from "./actions";
+import { importHrHelpdesk, runSlaChecksNow, saveAppUrl, saveAutoClose, saveBusinessHours, savePendingFollowUp, sendQueuedEmailsNow, sendTestEmail } from "./actions";
+import { emailConfig } from "@/lib/email/config";
+import { createAdminClient } from "@/lib/supabase/admin";
 
 export const metadata = { title: "Settings" };
 
@@ -37,6 +39,11 @@ function hoursPerDay(h: Hours) {
   return mins % 60 ? `${Math.floor(mins / 60)}h ${mins % 60}m` : `${mins / 60}h`;
 }
 
+/** ISO timestamp 24 hours ago (outside render for the purity lint rule). */
+function dayAgoIso() {
+  return new Date(Date.now() - 864e5).toISOString();
+}
+
 export default async function AdminSettingsPage() {
   await requireAdmin();
   const supabase = await createClient();
@@ -59,6 +66,18 @@ export default async function AdminSettingsPage() {
   const remaining = Math.max(0, legacyCount - importedCount);
   const perDay = hoursPerDay(hours);
   const tzKnown = TIMEZONES.some((t) => t.value === hours.timezone);
+
+  // Email status (counts come from the queue; admin already checked above).
+  const mail = emailConfig();
+  const admin = createAdminClient();
+  const since = dayAgoIso();
+  const head = { count: "exact" as const, head: true };
+  const [qPending, qSent, qFailed, lastFailure] = await Promise.all([
+    admin.from("notifications").select("id", head).in("email_status", ["pending", "sending"]),
+    admin.from("notifications").select("id", head).eq("email_status", "sent").gte("email_sent_at", since),
+    admin.from("notifications").select("id", head).eq("email_status", "failed").gte("created_at", since),
+    admin.from("notifications").select("email_error, created_at").eq("email_status", "failed").order("created_at", { ascending: false }).limit(1).maybeSingle(),
+  ]);
 
   return (
     <>
@@ -197,6 +216,72 @@ export default async function AdminSettingsPage() {
                 <SubmitButton>Save</SubmitButton>
               </div>
             </ActionForm>
+          </CardBody>
+        </Card>
+
+        <Card className="lg:col-span-2">
+          <CardHeader
+            title={
+              <span className="flex items-center gap-2">
+                <Mail className="h-4 w-4 text-primary-600" />
+                Email notifications
+              </span>
+            }
+            description="Every desk notification is also emailed (via Resend). People can turn emails off from their account menu."
+          />
+          <CardBody className="space-y-4">
+            {!mail.configured ? (
+              <p className="rounded-lg border border-amber-200 bg-amber-50 px-3 py-2 text-sm text-amber-900">
+                Not set up yet. Add <code>RESEND_API_KEY</code> (and <code>EMAIL_FROM</code> with your verified domain) in the hosting environment, then redeploy.
+                Notifications are queued meanwhile and go out once it&apos;s set.
+              </p>
+            ) : mail.usingSandboxSender ? (
+              <p className="rounded-lg border border-amber-200 bg-amber-50 px-3 py-2 text-sm text-amber-900">
+                Sending from Resend&apos;s test address, which only delivers to your own Resend account email. Verify your domain in Resend and set{" "}
+                <code>EMAIL_FROM</code> (e.g. <code>Grevya Service Desk &lt;desk@grevya.com&gt;</code>).
+              </p>
+            ) : null}
+            {!appUrl && (
+              <p className="rounded-lg border border-amber-200 bg-amber-50 px-3 py-2 text-sm text-amber-900">
+                Set the <strong>Service Desk address</strong> above so emails go out within seconds and their buttons link to the right page.
+              </p>
+            )}
+            <dl className="grid grid-cols-2 gap-2 text-center sm:grid-cols-4">
+              <div className="rounded-lg bg-slate-50 py-2">
+                <dt className="text-[11px] text-slate-500">Status</dt>
+                <dd className={`text-sm font-semibold ${mail.configured ? "text-emerald-700" : "text-amber-700"}`}>{mail.configured ? "On" : "Not set up"}</dd>
+              </div>
+              <div className="rounded-lg bg-slate-50 py-2">
+                <dt className="text-[11px] text-slate-500">Waiting to send</dt>
+                <dd className="text-lg font-semibold text-slate-900">{qPending.count ?? 0}</dd>
+              </div>
+              <div className="rounded-lg bg-slate-50 py-2">
+                <dt className="text-[11px] text-slate-500">Sent (24h)</dt>
+                <dd className="text-lg font-semibold text-slate-900">{qSent.count ?? 0}</dd>
+              </div>
+              <div className="rounded-lg bg-slate-50 py-2">
+                <dt className="text-[11px] text-slate-500">Failed (24h)</dt>
+                <dd className={`text-lg font-semibold ${(qFailed.count ?? 0) > 0 ? "text-red-700" : "text-slate-900"}`}>{qFailed.count ?? 0}</dd>
+              </div>
+            </dl>
+            <p className="text-xs text-slate-500">
+              From: <span className="font-medium text-slate-700">{mail.from}</span>
+              {lastFailure.data?.email_error && (
+                <>
+                  {" "}· Last failure: <span className="text-red-700">{lastFailure.data.email_error}</span>
+                </>
+              )}
+            </p>
+            <div className="flex flex-wrap gap-2">
+              <ActionButton action={sendTestEmail} variant="primary" size="md">
+                <Send className="h-4 w-4" />
+                Send me a test email
+              </ActionButton>
+              <ActionButton action={sendQueuedEmailsNow} variant="outline" size="md">
+                <Mail className="h-4 w-4" />
+                Send queued emails now
+              </ActionButton>
+            </div>
           </CardBody>
         </Card>
 

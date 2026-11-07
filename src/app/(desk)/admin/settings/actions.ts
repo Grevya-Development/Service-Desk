@@ -7,6 +7,10 @@ import { ok, fail, dbError, type ActionState } from "@/lib/actions";
 import type { Json } from "@/lib/database.types";
 import { str } from "@/lib/utils";
 import { guardAdmin } from "../_lib/access";
+import { emailConfig, recipientAllowed } from "@/lib/email/config";
+import { renderNotificationEmail } from "@/lib/email/template";
+import { sendEmail } from "@/lib/email/resend";
+import { dispatchPendingEmails } from "@/lib/email/dispatch";
 import { PENDING_LIMITS, TIME_RE, TIMEZONES, normalizeAppUrl } from "../_lib/validate";
 
 async function saveSettings(values: Record<string, NonNullable<Json>>): Promise<ActionState> {
@@ -104,4 +108,39 @@ export async function runSlaChecksNow(): Promise<ActionState> {
   revalidatePath("/admin/settings");
   const n = data ?? 0;
   return ok(n ? `SLA checks done: ${n} ticket update${n === 1 ? "" : "s"}` : "SLA checks done: nothing needed attention");
+}
+
+/** Send a test email to the signed-in admin, straight through Resend (not the queue). */
+export async function sendTestEmail(): Promise<ActionState> {
+  const g = await guardAdmin();
+  if (g.error !== undefined) return fail(g.error);
+  const cfg = emailConfig();
+  if (!cfg.configured) return fail("Email isn't set up: add RESEND_API_KEY in the hosting environment and redeploy.");
+  if (!recipientAllowed(g.me.email, cfg)) return fail(`${g.me.email} isn't in EMAIL_DEV_ALLOWLIST (needed outside production).`);
+  const { data } = await createAdminClient().from("settings").select("value").eq("key", "app_url").maybeSingle();
+  const base = typeof data?.value === "string" && data.value ? data.value.replace(/\/+$/, "") : null;
+  const mail = renderNotificationEmail({
+    recipientName: g.me.name,
+    title: "Test email from the Service Desk",
+    body: "If you can read this, email notifications are working. People will get an email like this when their requests change.",
+    url: base ? `${base}/home` : null,
+    deskUrl: base,
+  });
+  const res = await sendEmail({ to: g.me.email, ...mail, tags: [{ name: "kind", value: "test" }] }, `test-${g.me.id}-${Date.now()}`);
+  if (!res.ok) return fail(`Resend didn't accept it: ${res.error}`);
+  return ok(`Test email sent to ${g.me.email}`);
+}
+
+/** Send whatever is queued right now (normally automatic within seconds). */
+export async function sendQueuedEmailsNow(): Promise<ActionState> {
+  const g = await guardAdmin();
+  if (g.error !== undefined) return fail(g.error);
+  try {
+    const s = await dispatchPendingEmails();
+    revalidatePath("/admin/settings");
+    if (!s.configured) return fail("Email isn't set up: add RESEND_API_KEY and redeploy.");
+    return ok(s.claimed ? `Sent ${s.sent}, retrying ${s.retrying}, failed ${s.failed}, skipped ${s.skipped}` : "Nothing waiting to send");
+  } catch (e) {
+    return fail(e instanceof Error ? e.message : "Sending failed");
+  }
 }
