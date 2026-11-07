@@ -70,11 +70,16 @@ export async function setOwnTicketStatus(_prev: ActionState, fd: FormData): Prom
     if (!reason) return fail("Tell us what's still wrong");
     const { error } = await supabase.from("tickets").update({ status: "open" }).eq("id", ticket.id);
     if (error) return fail(dbError(error));
-    await supabase.from("ticket_messages").insert({ ticket_id: ticket.id, body: `Reopened: ${reason}`, author_id: me.id });
+    const { error: msgErr } = await supabase.from("ticket_messages").insert({ ticket_id: ticket.id, body: `Reopened: ${reason}`, author_id: me.id });
+    if (msgErr) return fail(`Reopened, but your note wasn't saved: ${dbError(msgErr)}`);
   } else {
+    // Post the reason first: requesters can't add messages once a ticket is closed.
+    if (reason) {
+      const { error: msgErr } = await supabase.from("ticket_messages").insert({ ticket_id: ticket.id, body: `Closed by requester: ${reason}`, author_id: me.id });
+      if (msgErr) return fail(dbError(msgErr));
+    }
     const { error } = await supabase.from("tickets").update({ status: "closed" }).eq("id", ticket.id);
     if (error) return fail(dbError(error));
-    if (reason) await supabase.from("ticket_messages").insert({ ticket_id: ticket.id, body: `Closed by requester: ${reason}`, author_id: me.id });
   }
   revalidateTicket(ticket.number);
   return ok(action === "reopen" ? "Ticket reopened" : "Ticket closed");

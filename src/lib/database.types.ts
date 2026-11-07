@@ -1892,7 +1892,10 @@ isOneToOne: false
                 }
           }
           Functions: {
-            "add_business_minutes":
+            "active_manager_of":
+{ Args: { "p_emp": string }; Returns: string
+                           },
+"add_business_minutes":
 { Args: { "p_minutes": number,"p_start": string }; Returns: string
                            },
 "business_hours":
@@ -2010,7 +2013,7 @@ isOneToOne: false
 { Args: Record<PropertyKey, never>; Returns: number
                            },
 "search_articles":
-{ Args: { "lim"?: number,"q": string }; Returns: {
+{ Args: { "any_term"?: boolean,"lim"?: number,"q": string }; Returns: {
               "author_id": string | null,
 "body": string,
 "category_id": string | null,

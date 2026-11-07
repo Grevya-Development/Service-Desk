@@ -5,7 +5,10 @@ import { redirect } from "next/navigation";
 import { getViewer } from "@/lib/auth";
 import { createClient } from "@/lib/supabase/server";
 
+const UUID_RE = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i;
+
 export async function markNotificationRead(id: string) {
+  if (typeof id !== "string" || !UUID_RE.test(id)) return;
   const me = await getViewer();
   if (!me) return;
   const supabase = await createClient();

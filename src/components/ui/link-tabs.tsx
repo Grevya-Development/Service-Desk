@@ -6,13 +6,31 @@ import { cn } from "@/lib/utils";
 
 export type LinkTab = { label: string; href: string; count?: number };
 
-/** URL-driven tabs. A tab is active when its href matches the current path + query. */
+/**
+ * URL-driven tabs. A tab is active when its path matches and every query
+ * parameter in its href is present in the current URL with the same value
+ * (extra params like page/q are ignored). The most specific match wins.
+ */
 export function LinkTabs({ tabs, className }: { tabs: LinkTab[]; className?: string }) {
   const pathname = usePathname();
-  const search = useSearchParams().toString();
-  const current = pathname + (search ? `?${search}` : "");
-  const exact = tabs.find((t) => t.href === current);
-  const activeHref = exact?.href ?? tabs.find((t) => t.href === pathname)?.href ?? tabs.find((t) => current.startsWith(t.href))?.href;
+  const params = useSearchParams();
+  let activeHref: string | undefined;
+  let best = -1;
+  for (const t of tabs) {
+    const [path, query = ""] = t.href.split("?");
+    if (path !== pathname) continue;
+    const wanted = new URLSearchParams(query);
+    let ok = true;
+    let n = 0;
+    wanted.forEach((v, k) => {
+      n++;
+      if (params.get(k) !== v) ok = false;
+    });
+    if (ok && n > best) {
+      best = n;
+      activeHref = t.href;
+    }
+  }
 
   return (
     <div className={cn("mb-5 flex gap-1 overflow-x-auto border-b border-slate-200 thin-scroll", className)}>

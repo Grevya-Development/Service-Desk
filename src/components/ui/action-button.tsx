@@ -1,6 +1,6 @@
 "use client";
 
-import { useState, useTransition, type ReactNode } from "react";
+import { useState, useTransition, type ReactNode, useId } from "react";
 import { toast } from "sonner";
 import { Loader2 } from "lucide-react";
 import { useRouter } from "next/navigation";
@@ -68,6 +68,7 @@ export function ActionButton({
   };
 
   const needsDialog = Boolean(confirm || prompt);
+  const fieldId = useId();
 
   return (
     <>
@@ -86,8 +87,8 @@ export function ActionButton({
         <Dialog open={open} onOpenChange={setOpen} title={confirm ?? "Add remarks"} size="sm">
           {prompt && (
             <div className="mb-4">
-              <Label required={promptRequired}>{prompt}</Label>
-              <Textarea value={remarks} onChange={(e) => setRemarks(e.target.value)} rows={3} autoFocus />
+              <Label htmlFor={fieldId} required={promptRequired}>{prompt}</Label>
+              <Textarea id={fieldId} value={remarks} onChange={(e) => setRemarks(e.target.value)} rows={3} autoFocus />
             </div>
           )}
           <div className="flex justify-end gap-2">
