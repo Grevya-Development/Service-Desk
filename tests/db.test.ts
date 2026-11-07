@@ -7,8 +7,8 @@ import { createClient, type SupabaseClient } from "@supabase/supabase-js";
 import { existsSync } from "node:fs";
 
 if (existsSync(".env.local")) process.loadEnvFile(".env.local");
-const URL_ = process.env.NEXT_PUBLIC_SUPABASE_URL ?? "";
-const ANON = process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY ?? "";
+const URL_ = process.env.SUPABASE_URL ?? "";
+const ANON = process.env.SUPABASE_ANON_KEY ?? "";
 const SERVICE = process.env.SUPABASE_SERVICE_ROLE_KEY ?? "";
 const enabled = /127\.0\.0\.1|localhost/.test(URL_) && !!SERVICE;
 

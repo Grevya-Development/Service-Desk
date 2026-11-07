@@ -103,6 +103,7 @@ export function DeskShell({
   notifications,
   unread,
   isAgent,
+  peopleSuccessUrl,
   children,
 }: {
   sections: NavSection[];
@@ -110,6 +111,7 @@ export function DeskShell({
   notifications: NotificationItem[];
   unread: number;
   isAgent: boolean;
+  peopleSuccessUrl: string;
   children: ReactNode;
 }) {
   const pathname = usePathname();
@@ -139,7 +141,7 @@ export function DeskShell({
         </div>
         <div className="flex shrink-0 items-center gap-1">
           <NotificationsMenu items={notifications} unread={unread} />
-          <UserMenu user={user} />
+          <UserMenu user={user} peopleSuccessUrl={peopleSuccessUrl} />
         </div>
       </header>
 

@@ -4,11 +4,10 @@ import { useEffect, useRef, useState } from "react";
 import { ExternalLink, LogOut } from "lucide-react";
 import { Avatar } from "@/components/ui/avatar";
 import { signOut } from "@/app/(desk)/_actions";
-import { PEOPLE_SUCCESS_URL } from "@/lib/nav";
 
 export type ShellUser = { name: string; email: string; avatarUrl: string | null; designation: string | null; roleLabel: string };
 
-export function UserMenu({ user }: { user: ShellUser }) {
+export function UserMenu({ user, peopleSuccessUrl }: { user: ShellUser; peopleSuccessUrl: string }) {
   const [open, setOpen] = useState(false);
   const ref = useRef<HTMLDivElement>(null);
   useEffect(() => {
@@ -28,7 +27,7 @@ export function UserMenu({ user }: { user: ShellUser }) {
             <p className="truncate text-xs text-slate-500">{user.email}</p>
             <p className="mt-1 text-[11px] font-medium text-primary-600">{user.roleLabel}</p>
           </div>
-          <a href={PEOPLE_SUCCESS_URL} className="flex items-center gap-2 px-4 py-2.5 text-sm text-slate-700 hover:bg-slate-50">
+          <a href={peopleSuccessUrl} className="flex items-center gap-2 px-4 py-2.5 text-sm text-slate-700 hover:bg-slate-50">
             <ExternalLink className="h-4 w-4 text-slate-400" /> Open People Success
           </a>
           <form action={signOut}>

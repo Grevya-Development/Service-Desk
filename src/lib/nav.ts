@@ -64,6 +64,3 @@ export function buildNav(v: NavViewer, counts: { approvals: number; unassigned: 
   }
   return sections;
 }
-
-/** People Success base URL (for the "Back to People Success" link). */
-export const PEOPLE_SUCCESS_URL = process.env.NEXT_PUBLIC_PEOPLE_SUCCESS_URL || "https://peoplesuccess.vercel.app";

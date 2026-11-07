@@ -44,8 +44,8 @@ Checks: `npm run typecheck`, `npm run lint`, `npm test` (database tests run when
    The migration also adds `servicedesk` to the Data API's exposed schemas (`pgrst.db_schemas`).
    If you later edit *Exposed schemas* in the Supabase dashboard, keep `servicedesk` in the list.
 2. **Vercel**: import the repo, framework Next.js, region is pinned to `syd1` by `vercel.json` (next to the database).
-   Environment variables: `NEXT_PUBLIC_SUPABASE_URL`, `NEXT_PUBLIC_SUPABASE_ANON_KEY`, `SUPABASE_SERVICE_ROLE_KEY`,
-   `CRON_SECRET`, `NEXT_PUBLIC_PEOPLE_SUCCESS_URL`.
+   Environment variables (none use the `NEXT_PUBLIC_` prefix; everything stays on the server): `SUPABASE_URL`, `SUPABASE_ANON_KEY`,
+   `SUPABASE_SERVICE_ROLE_KEY`, `CRON_SECRET`, `PEOPLE_SUCCESS_URL`. Optional: `SHOW_DEMO_LOGINS=true` (never in production).
 3. In the desk: **Administration → Settings** → set the App URL, add IT agents in **Teams & agents**, then **Import HR Helpdesk tickets**.
 4. In People Success (Vercel env): set `NEXT_PUBLIC_SERVICE_DESK_URL=<desk url>` and redeploy.
 5. Supabase Auth → URL configuration: add the desk URL to the redirect allow-list (password reset links).

@@ -62,7 +62,7 @@ export default async function LoginPage({ searchParams }: { searchParams: Promis
               That link has expired or was already used. Use <strong>Forgot password?</strong> below to get a new one.
             </div>
           )}
-          <LoginForm next={next} showDemo={process.env.NODE_ENV !== "production" || process.env.NEXT_PUBLIC_SHOW_DEMO === "true"} />
+          <LoginForm next={next} showDemo={process.env.NODE_ENV !== "production" || process.env.SHOW_DEMO_LOGINS === "true"} />
           <p className="mt-10 text-center text-xs text-slate-400">© {new Date().getFullYear()} Grevya · Service Desk · Same login as People Success</p>
         </div>
       </section>

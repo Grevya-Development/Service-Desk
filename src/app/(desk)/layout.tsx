@@ -42,6 +42,7 @@ export default async function DeskLayout({ children }: LayoutProps<"/">) {
       notifications={notes.data ?? []}
       unread={unread.count ?? 0}
       isAgent={me.isAgent}
+      peopleSuccessUrl={process.env.PEOPLE_SUCCESS_URL || "https://peoplesuccess.vercel.app"}
     >
       {children}
     </DeskShell>

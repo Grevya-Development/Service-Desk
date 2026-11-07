@@ -7,7 +7,7 @@ import type { Database } from "@/lib/database.types";
  * checking permissions yourself, and never import from client components.
  */
 export function createAdminClient() {
-  return createClient<Database, "servicedesk">(process.env.NEXT_PUBLIC_SUPABASE_URL!, process.env.SUPABASE_SERVICE_ROLE_KEY!, {
+  return createClient<Database, "servicedesk">(process.env.SUPABASE_URL!, process.env.SUPABASE_SERVICE_ROLE_KEY!, {
     db: { schema: "servicedesk" },
     auth: { autoRefreshToken: false, persistSession: false },
   });
