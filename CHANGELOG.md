@@ -2,6 +2,11 @@
 
 All notable changes to the Grevya Service Desk. Versions follow [Semantic Versioning](https://semver.org/).
 
+## [1.0.1] — 2026-11-07
+
+### Fixed
+- Docker image build: test configuration files are no longer included in the image (the 1.0.0 image failed to build).
+
 ## [1.0.0] — 2026-11-07
 
 First release. Internal IT and HR service desk on the People Success Supabase project (`servicedesk` schema), signed in with People Success accounts.
@@ -36,4 +41,5 @@ First release. Internal IT and HR service desk on the People Success Supabase pr
 - Own migration runner (`servicedesk.schema_migrations`), demo seed, 20 database tests, 42 unit tests, 54 Playwright end-to-end journeys.
 - Docker image published to GitHub Packages on every version tag; runtime configuration only.
 
+[1.0.1]: https://github.com/Grevya-Development/Service-Desk/releases/tag/v1.0.1
 [1.0.0]: https://github.com/Grevya-Development/Service-Desk/releases/tag/v1.0.0

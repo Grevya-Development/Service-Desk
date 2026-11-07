@@ -11,3 +11,5 @@ test-results
 docs
 *.log
 *.tsbuildinfo
+playwright.config.ts
+vitest.config.ts
