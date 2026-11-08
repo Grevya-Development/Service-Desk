@@ -1,6 +1,27 @@
 import { NextResponse } from "next/server";
 import { createAdminClient } from "@/lib/supabase/admin";
 import { emailConfig } from "@/lib/email/config";
+import { env } from "@/lib/env";
+
+/**
+ * Describe a Supabase key without revealing it: its format and, for JWT keys, the
+ * non-secret role and project ref from the payload. Helps spot "pasted the anon key" mistakes.
+ */
+function describeKey(key: string, expectedRef: string | null) {
+  if (!key) return "missing";
+  if (key.startsWith("sb_secret_")) return "new-style secret key (sb_secret_…)";
+  if (key.startsWith("sb_publishable_")) return "publishable key (sb_publishable_…) — this is not the service-role key";
+  const parts = key.split(".");
+  if (parts.length !== 3) return `not a recognised key format (${key.length} characters)`;
+  try {
+    const payload = JSON.parse(Buffer.from(parts[1], "base64url").toString("utf8")) as { role?: string; ref?: string };
+    const ref = payload.ref ?? "?";
+    const refNote = expectedRef && ref !== expectedRef ? ` — belongs to project ${ref}, but SUPABASE_URL is project ${expectedRef}` : "";
+    return `JWT key with role "${payload.role ?? "?"}"${payload.role === "service_role" ? "" : " — expected \"service_role\""}${refNote}`;
+  } catch {
+    return "JWT-shaped but unreadable";
+  }
+}
 
 export const dynamic = "force-dynamic";
 
@@ -16,6 +37,8 @@ export async function GET() {
       ? "SUPABASE_SERVICE_ROLE_KEY is not a valid key for this project"
       : text || `HTTP ${status}`;
   }
-  const body = { ok: !error, database: error ? "error" : "ok", status, reason, email: emailConfig().configured ? "configured" : "not configured", latencyMs: Date.now() - started, time: new Date().toISOString() };
+  const expectedRef = /^https:\/\/([a-z0-9]+)\.supabase\.co/.exec(env.supabaseUrl)?.[1] ?? null;
+  const serviceKey = error ? describeKey(env.supabaseServiceRoleKey, expectedRef) : undefined;
+  const body = { ok: !error, database: error ? "error" : "ok", status, reason, serviceKey, email: emailConfig().configured ? "configured" : "not configured", latencyMs: Date.now() - started, time: new Date().toISOString() };
   return NextResponse.json(body, { status: error ? 503 : 200, headers: { "cache-control": "no-store" } });
 }
