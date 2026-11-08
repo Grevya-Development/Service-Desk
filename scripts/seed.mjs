@@ -108,6 +108,8 @@ try {
         { key: "issue", label: "What looks wrong?", type: "textarea", required: true },
       ], 3),
     };
+    // People Success opens this item for every new joiner (see migration 0010).
+    await tx`update servicedesk.catalog_items set system_key = 'new_joiner' where id = ${CI.onboarding}`;
 
     // ---- knowledge base ----------------------------------------------------
     const article = async (team, cat, slug, title, summary, body, tags, views, status = "published", visibility = "everyone", author = emp.arvind) => {
