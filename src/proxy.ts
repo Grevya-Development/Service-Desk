@@ -17,6 +17,42 @@ function missingConfig() {
   );
 }
 
+type Flagged = { app_metadata?: unknown; user_metadata?: unknown };
+/** HR's "choose your own password" flag (app_metadata; user_metadata for accounts flagged before that). */
+function mustChangePassword(u: Flagged | null | undefined) {
+  return (
+    (u?.app_metadata as { must_change_password?: boolean } | undefined)?.must_change_password === true ||
+    (u?.user_metadata as { must_change_password?: boolean } | undefined)?.must_change_password === true
+  );
+}
+
+/**
+ * The token's copy of the flag can be stale: the password may have been changed in the other Grevya
+ * app (each app has its own session). Only for flagged tokens, ask Supabase Auth for the current user.
+ * - Flag gone: refresh the session (new cookies go out on the response) and let them through.
+ * - Session gone (changing a password signs out the user's other sessions): sign out here too.
+ */
+async function passwordFlagState(supabase: ReturnType<typeof createServerClient>): Promise<"change" | "ok" | "signed_out"> {
+  const { data, error } = await supabase.auth.getUser();
+  if (error) {
+    if (error.status === 401 || error.status === 403 || error.name === "AuthSessionMissingError") {
+      await supabase.auth.signOut({ scope: "local" });
+      return "signed_out";
+    }
+    return "change";
+  }
+  if (!data.user || mustChangePassword(data.user)) return "change";
+  await supabase.auth.refreshSession();
+  return "ok";
+}
+
+/** Redirect while keeping any auth cookies the Supabase client just set on `from`. */
+function redirectWith(from: NextResponse, url: URL) {
+  const res = NextResponse.redirect(url);
+  from.cookies.getAll().forEach((c) => res.cookies.set(c));
+  return res;
+}
+
 export async function proxy(request: NextRequest) {
   const misconfigured = missingConfig();
   if (misconfigured) return misconfigured;
@@ -55,6 +91,17 @@ export async function proxy(request: NextRequest) {
     const target = path + request.nextUrl.search;
     url.search = path && path !== "/" ? `?next=${encodeURIComponent(target)}` : "";
     return NextResponse.redirect(url);
+  }
+  // A temporary password set by HR (People Success): choose your own before using the desk.
+  // app_metadata can only be written by the service role; user_metadata covers older accounts.
+  if (user && mustChangePassword(user) && !path.startsWith("/auth") && !path.startsWith("/api/")) {
+    const state = await passwordFlagState(supabase);
+    if (state !== "ok") {
+      const url = request.nextUrl.clone();
+      url.pathname = state === "signed_out" ? "/login" : "/auth/reset";
+      url.search = state === "signed_out" ? "" : "?first=1";
+      return redirectWith(response, url);
+    }
   }
   if (user && path === "/login") {
     const url = request.nextUrl.clone();

@@ -56,6 +56,15 @@ export async function validateFiles(files: File[]) {
 
 export type StoredFile = { path: string; name: string; size: number; mime: string | null };
 
+// Types the browser may render inline from a signed URL. Anything else (HTML, SVG, scripts…)
+// is stored as a plain download so an attachment can't run script when an agent opens it.
+const INLINE_TYPES = new Set(["image/png", "image/jpeg", "image/gif", "image/webp", "application/pdf", "text/plain", "text/csv"]);
+const storedType = (type: string) => {
+  const t = type.toLowerCase().split(";")[0].trim();
+  if (!t) return undefined;
+  return INLINE_TYPES.has(t) || /^application\/(vnd\.|msword|zip)/.test(t) ? t : "application/octet-stream";
+};
+
 /**
  * Upload validated files under tickets/<ticketId>/ with the service role.
  * Only call after the caller proved access to the ticket (RLS-checked read).
@@ -66,12 +75,12 @@ export async function uploadTicketFiles(ticketId: string, files: File[]): Promis
   for (const f of files) {
     const safe = f.name.replace(/[^a-zA-Z0-9._-]/g, "_").slice(-80) || "file";
     const path = `tickets/${ticketId}/${crypto.randomUUID()}-${safe}`;
-    const { error } = await admin.storage.from(BUCKET).upload(path, f, { contentType: f.type || undefined });
+    const { error } = await admin.storage.from(BUCKET).upload(path, f, { contentType: storedType(f.type) });
     if (error) {
       await removeFiles(stored.map((s) => s.path));
       throw new Error(`Could not upload “${f.name}”: ${error.message}`);
     }
-    stored.push({ path, name: f.name.slice(0, 200), size: f.size, mime: f.type || null });
+    stored.push({ path, name: f.name.slice(0, 200), size: f.size, mime: storedType(f.type) ?? null });
   }
   return stored;
 }

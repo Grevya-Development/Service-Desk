@@ -27,6 +27,7 @@ export const APPROVAL_META: Record<string, { label: string; tone: Tone }> = {
   pending: { label: "Awaiting approval", tone: "yellow" },
   approved: { label: "Approved", tone: "green" },
   rejected: { label: "Rejected", tone: "red" },
+  cancelled: { label: "Withdrawn", tone: "gray" },
 };
 
 export const APPROVAL_KINDS = { none: "No approval", manager: "Requester's manager", team_lead: "Team lead" } as const;

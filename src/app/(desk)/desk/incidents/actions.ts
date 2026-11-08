@@ -161,9 +161,10 @@ export async function linkTickets(_prev: ActionState, fd: FormData): Promise<Act
   if (readError) return fail(dbError(readError));
   const byNumber = new Map((rows ?? []).map((t) => [t.number, t]));
   const missing = numbers.filter((n) => !byNumber.has(n));
-  const notMine = (rows ?? []).filter((t) => !me.agentTeamIds.includes(t.team_id)).map((t) => t.number);
+  // Incidents only cover their own team's tickets (resolving the incident resolves them too).
+  const notMine = (rows ?? []).filter((t) => t.team_id !== found.incident.team_id).map((t) => t.number);
   const already = (rows ?? []).filter((t) => t.incident_id === found.incident.id).map((t) => t.number);
-  const toLink = (rows ?? []).filter((t) => me.agentTeamIds.includes(t.team_id) && t.incident_id !== found.incident.id);
+  const toLink = (rows ?? []).filter((t) => t.team_id === found.incident.team_id && t.incident_id !== found.incident.id);
 
   if (toLink.length) {
     const { data: updated, error } = await supabase

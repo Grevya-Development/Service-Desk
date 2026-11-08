@@ -1337,6 +1337,9 @@ isOneToOne: false
 "auth_employee_id":
 { Args: Record<PropertyKey, never>; Returns: string
                            },
+"auth_login_disabled":
+{ Args: Record<PropertyKey, never>; Returns: boolean
+                           },
 "auth_role":
 { Args: Record<PropertyKey, never>; Returns: string
                            },
@@ -1551,14 +1554,14 @@ isOneToOne: false
                   ]
                 },"catalog_items": {
                   Row: {
-                    "active": boolean,"approval": string,"category_id": string | null,"created_at": string,"default_priority": string,"description": string | null,"expected_days": number | null,"fields": NonNullable<Json>,"icon": string,"id": string,"name": string,"sort_order": number,"team_id": string,"updated_at": string
+                    "active": boolean,"approval": string,"category_id": string | null,"created_at": string,"default_priority": string,"description": string | null,"expected_days": number | null,"fields": NonNullable<Json>,"icon": string,"id": string,"name": string,"sort_order": number,"system_key": string | null,"team_id": string,"updated_at": string
                   }
                   ComputedFields: never
                   Insert: {
-                    "active"?: boolean,"approval"?: string,"category_id"?: string | null,"created_at"?: string,"default_priority"?: string,"description"?: string | null,"expected_days"?: number | null,"fields"?: NonNullable<Json>,"icon"?: string,"id"?: string,"name": string,"sort_order"?: number,"team_id": string,"updated_at"?: string
+                    "active"?: boolean,"approval"?: string,"category_id"?: string | null,"created_at"?: string,"default_priority"?: string,"description"?: string | null,"expected_days"?: number | null,"fields"?: NonNullable<Json>,"icon"?: string,"id"?: string,"name": string,"sort_order"?: number,"system_key"?: string | null,"team_id": string,"updated_at"?: string
                   }
                   Update: {
-                    "active"?: boolean,"approval"?: string,"category_id"?: string | null,"created_at"?: string,"default_priority"?: string,"description"?: string | null,"expected_days"?: number | null,"fields"?: NonNullable<Json>,"icon"?: string,"id"?: string,"name"?: string,"sort_order"?: number,"team_id"?: string,"updated_at"?: string
+                    "active"?: boolean,"approval"?: string,"category_id"?: string | null,"created_at"?: string,"default_priority"?: string,"description"?: string | null,"expected_days"?: number | null,"fields"?: NonNullable<Json>,"icon"?: string,"id"?: string,"name"?: string,"sort_order"?: number,"system_key"?: string | null,"team_id"?: string,"updated_at"?: string
                   }
                   Relationships: [
                     {
@@ -1971,7 +1974,7 @@ isOneToOne: false
                   ]
                 },"tickets": {
                   Row: {
-                    "approval_status": string,"approved_at": string | null,"asset_id": string | null,"assignee_id": string | null,"catalog_item_id": string | null,"category_id": string | null,"closed_at": string | null,"created_at": string,"created_by": string | null,"csat_at": string | null,"csat_comment": string | null,"csat_rating": string | null,"description": string,"first_responded_at": string | null,"first_response_due": string | null,"form_data": Json | null,"id": string,"incident_id": string | null,"legacy_id": string | null,"legacy_ref": string | null,"merged_into": string | null,"number": number,"pending_reminded_at": string | null,"pending_since": string | null,"priority": string,"requester_id": string,"resolution_breached": boolean,"resolution_due": string | null,"resolution_warned": boolean,"resolved_at": string | null,"response_breached": boolean,"response_warned": boolean,"sla_paused_minutes": number,"source": string,"status": string,"subject": string,"team_id": string,"type": string,"updated_at": string,"compute_sla": {
+                    "approval_status": string,"approved_at": string | null,"asset_id": string | null,"assignee_id": string | null,"catalog_item_id": string | null,"category_id": string | null,"closed_at": string | null,"created_at": string,"created_by": string | null,"csat_at": string | null,"csat_comment": string | null,"csat_rating": string | null,"description": string,"first_responded_at": string | null,"first_response_due": string | null,"form_data": Json | null,"id": string,"incident_id": string | null,"joiner_id": string | null,"onboarding_task_id": string | null,"legacy_id": string | null,"legacy_ref": string | null,"merged_into": string | null,"number": number,"pending_reminded_at": string | null,"pending_since": string | null,"priority": string,"requester_id": string,"resolution_breached": boolean,"resolution_due": string | null,"resolution_warned": boolean,"resolved_at": string | null,"response_breached": boolean,"response_warned": boolean,"sla_paused_minutes": number,"source": string,"status": string,"subject": string,"team_id": string,"type": string,"updated_at": string,"compute_sla": {
               "approval_status": string,
 "approved_at": string | null,
 "asset_id": string | null,
@@ -2015,7 +2018,7 @@ isOneToOne: false
                   }
                   ComputedFields: "compute_sla"
                   Insert: {
-                    "approval_status"?: string,"approved_at"?: string | null,"asset_id"?: string | null,"assignee_id"?: string | null,"catalog_item_id"?: string | null,"category_id"?: string | null,"closed_at"?: string | null,"created_at"?: string,"created_by"?: string | null,"csat_at"?: string | null,"csat_comment"?: string | null,"csat_rating"?: string | null,"description": string,"first_responded_at"?: string | null,"first_response_due"?: string | null,"form_data"?: Json | null,"id"?: string,"incident_id"?: string | null,"legacy_id"?: string | null,"legacy_ref"?: string | null,"merged_into"?: string | null,"number"?: never,"pending_reminded_at"?: string | null,"pending_since"?: string | null,"priority"?: string,"requester_id": string,"resolution_breached"?: boolean,"resolution_due"?: string | null,"resolution_warned"?: boolean,"resolved_at"?: string | null,"response_breached"?: boolean,"response_warned"?: boolean,"sla_paused_minutes"?: number,"source"?: string,"status"?: string,"subject": string,"team_id": string,"type"?: string,"updated_at"?: string
+                    "approval_status"?: string,"approved_at"?: string | null,"asset_id"?: string | null,"assignee_id"?: string | null,"catalog_item_id"?: string | null,"category_id"?: string | null,"closed_at"?: string | null,"created_at"?: string,"created_by"?: string | null,"csat_at"?: string | null,"csat_comment"?: string | null,"csat_rating"?: string | null,"description": string,"first_responded_at"?: string | null,"first_response_due"?: string | null,"form_data"?: Json | null,"id"?: string,"incident_id"?: string | null,"joiner_id"?: string | null,"onboarding_task_id"?: string | null,"legacy_id"?: string | null,"legacy_ref"?: string | null,"merged_into"?: string | null,"number"?: never,"pending_reminded_at"?: string | null,"pending_since"?: string | null,"priority"?: string,"requester_id": string,"resolution_breached"?: boolean,"resolution_due"?: string | null,"resolution_warned"?: boolean,"resolved_at"?: string | null,"response_breached"?: boolean,"response_warned"?: boolean,"sla_paused_minutes"?: number,"source"?: string,"status"?: string,"subject": string,"team_id": string,"type"?: string,"updated_at"?: string
                   }
                   Update: {
                     "approval_status"?: string,"approved_at"?: string | null,"asset_id"?: string | null,"assignee_id"?: string | null,"catalog_item_id"?: string | null,"category_id"?: string | null,"closed_at"?: string | null,"created_at"?: string,"created_by"?: string | null,"csat_at"?: string | null,"csat_comment"?: string | null,"csat_rating"?: string | null,"description"?: string,"first_responded_at"?: string | null,"first_response_due"?: string | null,"form_data"?: Json | null,"id"?: string,"incident_id"?: string | null,"legacy_id"?: string | null,"legacy_ref"?: string | null,"merged_into"?: string | null,"number"?: never,"pending_reminded_at"?: string | null,"pending_since"?: string | null,"priority"?: string,"requester_id"?: string,"resolution_breached"?: boolean,"resolution_due"?: string | null,"resolution_warned"?: boolean,"resolved_at"?: string | null,"response_breached"?: boolean,"response_warned"?: boolean,"sla_paused_minutes"?: number,"source"?: string,"status"?: string,"subject"?: string,"team_id"?: string,"type"?: string,"updated_at"?: string

@@ -37,7 +37,8 @@ function plain(s: string) {
 
 export function renderNotificationEmail(input: NotificationEmailInput) {
   const first = (input.recipientName ?? "").trim().split(/\s+/)[0] || "there";
-  const title = plain(input.title).slice(0, 200);
+  // Never an empty subject (Resend rejects it): fall back to a generic title.
+  const title = plain(input.title ?? "").slice(0, 200) || "You have an update in the Service Desk";
   const body = input.body ? plain(input.body).slice(0, 600) : "";
   const url = safeUrl(input.url);
   const deskUrl = safeUrl(input.deskUrl);

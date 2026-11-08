@@ -25,7 +25,7 @@ export default async function AdminCatalogPage({ searchParams }: { searchParams:
   const { data: items } = teamIds.length
     ? await supabase
         .from("catalog_items")
-        .select("id, team_id, name, description, icon, approval, active, sort_order, fields, category:categories(name), requests:tickets(count)")
+        .select("id, team_id, name, description, icon, approval, active, sort_order, fields, system_key, category:categories(name), requests:tickets(count)")
         .in("team_id", teamIds)
         .order("sort_order")
         .order("name")
@@ -121,7 +121,14 @@ export default async function AdminCatalogPage({ searchParams }: { searchParams:
                           <NamedIcon name={it.icon} className="h-4 w-4" />
                         </span>
                         <span className="min-w-0">
-                          <span className="block truncate font-medium text-slate-800 group-hover:text-primary-700">{it.name}</span>
+                          <span className="flex items-center gap-1.5">
+                            <span className="truncate font-medium text-slate-800 group-hover:text-primary-700">{it.name}</span>
+                            {it.system_key && (
+                              <span title="Opened automatically by People Success for new joiners">
+                                <Badge tone="purple">People Success</Badge>
+                              </span>
+                            )}
+                          </span>
                           {it.description && <span className="block max-w-xs truncate text-xs text-slate-500">{it.description}</span>}
                         </span>
                       </Link>
@@ -140,7 +147,12 @@ export default async function AdminCatalogPage({ searchParams }: { searchParams:
                           <Pencil className="h-3.5 w-3.5" />
                           <span className="hidden sm:inline">Edit</span>
                         </Link>
-                        <ActionButton action={setCatalogActive} fields={{ id: it.id, active: !it.active }} variant="outline">
+                        <ActionButton
+                          action={setCatalogActive}
+                          fields={{ id: it.id, active: !it.active }}
+                          variant="outline"
+                          confirm={it.system_key && it.active ? "Hide it? People Success will stop opening IT setup requests for new joiners." : undefined}
+                        >
                           {it.active ? "Hide" : "Show"}
                         </ActionButton>
                       </div>

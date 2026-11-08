@@ -21,7 +21,7 @@ export default async function EditCatalogItemPage({ params }: { params: Promise<
   const [{ data: item }, editor, { count: requests }] = await Promise.all([
     supabase
       .from("catalog_items")
-      .select("id, team_id, category_id, name, description, icon, approval, default_priority, expected_days, active, sort_order, fields")
+      .select("id, team_id, category_id, name, description, icon, approval, default_priority, expected_days, active, sort_order, fields, system_key")
       .eq("id", id)
       .maybeSingle(),
     loadEditorData(supabase, me),
@@ -31,6 +31,7 @@ export default async function EditCatalogItemPage({ params }: { params: Promise<
 
   const approval = (["none", "manager", "team_lead"].includes(item.approval) ? item.approval : "none") as ApprovalKind;
   const used = (requests ?? 0) > 0;
+  const system = Boolean(item.system_key);
 
   return (
     <>
@@ -39,30 +40,45 @@ export default async function EditCatalogItemPage({ params }: { params: Promise<
           <span className="flex flex-wrap items-center gap-2">
             {item.name}
             {!item.active && <Badge tone="gray">Hidden</Badge>}
+            {system && <Badge tone="purple">People Success</Badge>}
           </span>
         }
-        description={used ? `${requests} request${requests === 1 ? "" : "s"} so far.` : "No requests yet."}
+        description={
+          (system
+            ? item.active
+              ? "People Success opens this request automatically when HR adds a new joiner. "
+              : "Hidden, so People Success isn't opening IT setup requests for new joiners. "
+            : "") + (used ? `${requests} request${requests === 1 ? "" : "s"} so far.` : "No requests yet.")
+        }
         breadcrumbs={[{ label: "Administration" }, { label: "Service catalog", href: "/admin/catalog" }, { label: item.name }]}
         actions={
           <>
-            <ActionButton action={setCatalogActive} fields={{ id: item.id, active: !item.active }} variant="outline" size="md">
+            <ActionButton
+              action={setCatalogActive}
+              fields={{ id: item.id, active: !item.active }}
+              variant="outline"
+              size="md"
+              confirm={system && item.active ? "Hide it? People Success will stop opening IT setup requests for new joiners." : undefined}
+            >
               {item.active ? "Hide from catalog" : "Show in catalog"}
             </ActionButton>
-            <ActionButton
-              action={deleteCatalogItem}
-              fields={{ id: item.id }}
-              variant="danger"
-              size="md"
-              className="bg-white text-red-600 shadow-none ring-1 ring-red-200 hover:bg-red-50"
-              confirm={
-                used
-                  ? `“${item.name}” has requests, so it will be hidden from the catalog instead of deleted. Continue?`
-                  : `Delete “${item.name}”? This can't be undone.`
-              }
-            >
-              <Trash2 className="h-4 w-4" />
-              Delete
-            </ActionButton>
+            {!system && (
+              <ActionButton
+                action={deleteCatalogItem}
+                fields={{ id: item.id }}
+                variant="danger"
+                size="md"
+                className="bg-white text-red-600 shadow-none ring-1 ring-red-200 hover:bg-red-50"
+                confirm={
+                  used
+                    ? `“${item.name}” has requests, so it will be hidden from the catalog instead of deleted. Continue?`
+                    : `Delete “${item.name}”? This can't be undone.`
+                }
+              >
+                <Trash2 className="h-4 w-4" />
+                Delete
+              </ActionButton>
+            )}
           </>
         }
       />

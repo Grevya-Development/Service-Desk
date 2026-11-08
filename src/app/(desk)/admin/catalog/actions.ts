@@ -99,7 +99,7 @@ export async function saveCatalogItem(_prev: ActionState, fd: FormData): Promise
 async function loadOwnedItem(id: string | null) {
   if (!isUuid(id)) return { error: "Catalog item not found." };
   const supabase = await createClient();
-  const { data: item } = await supabase.from("catalog_items").select("id, team_id, name").eq("id", id).maybeSingle();
+  const { data: item } = await supabase.from("catalog_items").select("id, team_id, name, system_key").eq("id", id).maybeSingle();
   if (!item) return { error: "Catalog item not found." };
   const g = await guardLead(item.team_id);
   if (g.error !== undefined) return { error: g.error };
@@ -113,6 +113,9 @@ export async function setCatalogActive(_prev: ActionState, fd: FormData): Promis
   const { error } = await res.supabase.from("catalog_items").update({ active }).eq("id", res.item.id);
   if (error) return fail(dbError(error));
   revalidateCatalog(res.item.id);
+  if (res.item.system_key && !active) {
+    return ok(`“${res.item.name}” is hidden. People Success won't open IT setup requests for new joiners until you show it again.`);
+  }
   return ok(active ? `“${res.item.name}” is back in the catalog` : `“${res.item.name}” is hidden from the catalog`);
 }
 
@@ -120,6 +123,7 @@ export async function deleteCatalogItem(_prev: ActionState, fd: FormData): Promi
   const res = await loadOwnedItem(str(fd, "id"));
   if (!res.item) return fail(res.error ?? "Catalog item not found.");
   const { supabase, item } = res;
+  if (item.system_key) return fail(`“${item.name}” is used by People Success for new joiners, so it can't be deleted. Hide it instead.`);
   // Count with the service-role client (permission checked above) so tickets
   // since transferred to another team still count.
   const { count, error: countErr } = await createAdminClient().from("tickets").select("id", { count: "exact", head: true }).eq("catalog_item_id", item.id);

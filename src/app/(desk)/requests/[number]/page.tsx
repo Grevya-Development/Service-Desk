@@ -150,7 +150,7 @@ export default async function RequestPage({ params }: { params: Promise<{ number
           )}
 
           {!isRequester && !isFollower && (
-            <Callout icon={Lock} tone="slate" title="You're viewing this as an approver">
+            <Callout icon={Lock} tone="slate" title={ticket.joiner_id ? "You're viewing this new-joiner request as HR" : "You're viewing this as an approver"}>
               Only {requesterName}, people they&apos;ve added and the support team can reply here.
               {ticket.approval_status === "pending" && (
                 <>
@@ -204,7 +204,9 @@ export default async function RequestPage({ params }: { params: Promise<{ number
                 <div className="min-w-0 text-sm">
                   <p className="font-semibold text-slate-800">
                     {ticket.approval_status === "rejected"
-                        ? "This request wasn't approved and is closed"
+                      ? "This request wasn't approved and is closed"
+                      : ticket.approval_status === "cancelled"
+                        ? "This request was withdrawn before it was approved"
                         : "This request is closed"}
                   </p>
                   <p className="mt-0.5 text-slate-600">
@@ -362,7 +364,13 @@ function NextSteps({
   else if (ticket.status === "pending") summary = `The team is waiting for a reply from ${you}. The clock is paused until then.`;
   else if (ticket.status === "resolved")
     summary = reopenUntil ? `Marked as fixed. It closes automatically after ${formatDate(reopenUntil.toISOString())} unless ${you} reopen${isRequester ? "" : "s"} it.` : "Marked as fixed.";
-  else summary = ticket.approval_status === "rejected" ? "This request wasn't approved, so it's closed." : "All done. This request is closed.";
+  else
+    summary =
+      ticket.approval_status === "rejected"
+        ? "This request wasn't approved, so it's closed."
+        : ticket.approval_status === "cancelled"
+          ? "Withdrawn before it was approved, so it's closed."
+          : "All done. This request is closed.";
 
   const firstReply = ticket.first_responded_at
     ? { text: `Replied ${formatDateTime(ticket.first_responded_at)}`, done: true }
@@ -444,13 +452,19 @@ function ApprovalsCard({ approvals, isRequester }: { approvals: ApprovalView[]; 
         <ul className="space-y-4">
           {approvals.map((a) => {
             const meta = APPROVAL_META[a.status] ?? { label: a.status, tone: "gray" as const };
-            const Icon = a.status === "approved" ? CheckCircle2 : a.status === "rejected" ? XCircle : Hourglass;
+            const Icon = a.status === "approved" ? CheckCircle2 : a.status === "rejected" || a.status === "cancelled" ? XCircle : Hourglass;
             return (
               <li key={a.id} className="flex items-start gap-3">
                 <span
                   className={cn(
                     "flex h-8 w-8 shrink-0 items-center justify-center rounded-full",
-                    a.status === "approved" ? "bg-emerald-50 text-emerald-600" : a.status === "rejected" ? "bg-red-50 text-red-600" : "bg-amber-50 text-amber-600",
+                    a.status === "approved"
+                      ? "bg-emerald-50 text-emerald-600"
+                      : a.status === "rejected"
+                        ? "bg-red-50 text-red-600"
+                        : a.status === "cancelled"
+                          ? "bg-slate-100 text-slate-500"
+                          : "bg-amber-50 text-amber-600",
                   )}
                 >
                   <Icon className="h-4 w-4" aria-hidden />

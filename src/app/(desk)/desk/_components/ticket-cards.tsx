@@ -270,7 +270,11 @@ export function ApprovalsCard({ approvals }: { approvals: ApprovalView[] }) {
                 {meta && <Badge tone={meta.tone}>{meta.label === "Awaiting approval" ? "Waiting" : meta.label}</Badge>}
               </div>
               <p className="mt-0.5 text-slate-400">
-                {a.decided_at ? `${humanize(a.status)} by ${a.decider?.full_name ?? "—"} · ${formatDateTime(a.decided_at)}` : `Asked ${formatDateTime(a.created_at)}`}
+                {a.status === "cancelled" && a.decided_at
+                  ? `Withdrawn · ${formatDateTime(a.decided_at)}`
+                  : a.decided_at
+                    ? `${humanize(a.status)} by ${a.decider?.full_name ?? "—"} · ${formatDateTime(a.decided_at)}`
+                    : `Asked ${formatDateTime(a.created_at)}`}
               </p>
               {a.comment && <p className="mt-1 rounded-md bg-slate-50 px-2 py-1.5 text-slate-600">“{a.comment}”</p>}
             </div>

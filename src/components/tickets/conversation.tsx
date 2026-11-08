@@ -59,6 +59,7 @@ function eventText(e: Extract<TimelineItem, { kind: "event" }>, audience: "agent
     case "category":
       return `${who} changed category to ${e.to ?? "none"}`;
     case "approval":
+      if (e.to === "cancelled") return `Withdrawn before approval${e.actor ? ` by ${who}` : ""}`;
       return `${e.to === "approved" ? "Approved" : e.to === "rejected" ? "Rejected" : humanize(e.to)}${e.actor ? ` by ${who}` : ""}`;
     case "csat":
       return `${who} rated the resolution ${e.to === "good" ? "👍 good" : "👎 not good"}`;

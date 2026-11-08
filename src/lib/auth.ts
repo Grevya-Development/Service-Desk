@@ -34,6 +34,16 @@ export type Viewer = {
   leadTeamIds: string[];
 };
 
+/**
+ * Whether HR has disabled this person's login in People Success (Admin → Accounts). Tokens are verified
+ * locally, so a disabled user's token keeps working until it expires; this stops them on the next request.
+ */
+export const loginDisabled = cache(async (): Promise<boolean> => {
+  const supabase = await createClient();
+  const { data } = await supabase.schema("public").rpc("auth_login_disabled");
+  return data === true;
+});
+
 /** Signed-in employee + desk roles for this request (deduplicated per request). */
 export const getViewer = cache(async (): Promise<Viewer | null> => {
   const supabase = await createClient();
@@ -41,14 +51,17 @@ export const getViewer = cache(async (): Promise<Viewer | null> => {
   const userId = auth?.claims?.sub;
   if (!userId) return null;
 
-  const { data: emp } = await supabase
-    .schema("public")
-    .from("employees")
-    .select("id, full_name, first_name, email, avatar_url, employee_code, manager_id, role, status, designation:designations(title), department:departments(name)")
-    .eq("user_id", userId)
-    .neq("status", "exited")
-    .maybeSingle();
-  if (!emp) return null;
+  const [{ data: emp }, disabled] = await Promise.all([
+    supabase
+      .schema("public")
+      .from("employees")
+      .select("id, full_name, first_name, email, avatar_url, employee_code, manager_id, role, status, designation:designations(title), department:departments(name)")
+      .eq("user_id", userId)
+      .neq("status", "exited")
+      .maybeSingle(),
+    loginDisabled(),
+  ]);
+  if (!emp || disabled) return null;
 
   const [{ data: members }, { data: teams }] = await Promise.all([
     supabase.from("team_members").select("role, team:teams(id, key, name, color, manages_assets, active)").eq("employee_id", emp.id),
