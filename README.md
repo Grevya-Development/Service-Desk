@@ -7,6 +7,7 @@ read help articles and see their assigned devices.
 - **Help center** (everyone): report an issue, service catalog, my requests, knowledge base, my assets, approvals.
 - **Agent workspace**: ticket queue with SLA timers, ticket workspace (replies, internal notes, assignment, transfers), raise tickets on behalf of people, article management, asset register, reports.
 - **Administration** (team leads / desk admins): teams and agents, categories, SLA targets, service catalog builder, business hours, HR helpdesk import.
+- **Admin console** (desk admins): admins sign in to an all-teams **Overview** dashboard (`/admin`) with an admin-only menu (Dashboard, Operations, Configuration): open / unassigned / overdue / approval tiles, created-vs-resolved trend, open tickets by team, stage, priority and age, SLA meters, top categories, oldest tickets, incidents, agent workload and assets. **Switch to my requests** shows the normal help center; **Back to admin console** returns.
 - **Service status**: agents declare incidents ("Email is down — we're on it"); everyone sees a banner, can tap "I'm affected", and gets one notification when it's fixed. Resolving an incident can resolve every linked ticket at once.
 - **Less typing for agents**: reply templates with placeholders, article links, bulk actions, merge duplicates, keyboard shortcuts (`?`), CSV exports, paste/drag-drop screenshots.
 - **Followers / CC** on requests, **away status** (auto-assign skips you), automatic **reminders** and auto-resolve for tickets waiting on the requester.
@@ -19,7 +20,7 @@ Design: [`docs/spec.md`](docs/spec.md). Code conventions: [`docs/CONVENTIONS.md`
 |---|---|
 | Database | Same Supabase project. All desk tables live in the `servicedesk` schema; it reads `public.employees`, departments, designations, locations and holidays. |
 | Sign-in | Same Supabase users. Anyone with an active employee record can sign in. |
-| Roles | Desk admin = People Success `super_admin`. Agents and team leads are managed in **Administration → Teams & agents**. |
+| Roles | Desk admin = People Success `super_admin` (lands on the admin console). Agents and team leads are managed in **Administration → Teams & agents**. People Success HR admins can open new-joiner IT requests linked from onboarding. |
 | HR helpdesk | Old HR tickets are imported into the HR team (`servicedesk.import_hr_helpdesk()`, re-runnable). Set `NEXT_PUBLIC_SERVICE_DESK_URL` in People Success to redirect its helpdesk pages here. |
 | Notifications | In-app bell here; updates for requesters and approvers are also copied to People Success notifications (needs **Settings → App URL**). |
 
@@ -37,7 +38,9 @@ npm run db:seed                          # demo agents, catalog, articles, asset
 npm run dev                              # http://localhost:3200
 ```
 
-Demo logins (password `Grevya@123`): `priya@grevya.com` employee · `kavin@` manager/approver · `manoj@`, `lakshmi@` IT agents · `arvind@` IT lead · `hr@` HR lead · `divya@` HR agent · `admin@` desk admin.
+Demo logins (local / demo data only, password `Grevya@123`): `priya@grevya.com` employee · `kavin@` manager/approver · `manoj@`, `lakshmi@` IT agents · `arvind@` IT lead · `hr@` HR lead · `divya@` HR agent · `admin@` desk admin (admin console).
+
+In production everyone signs in with their People Success account and password. A temporary password from HR must be changed at first sign-in (the new password works in both apps), and a login disabled in People Success can't sign in here either.
 
 Checks: `npm run typecheck`, `npm run lint`, `npm test` (unit + database tests; database tests run when `.env.local` points at the local stack), `npm run test:e2e` (Playwright end-to-end journeys against the local stack; reseeds demo data first).
 
