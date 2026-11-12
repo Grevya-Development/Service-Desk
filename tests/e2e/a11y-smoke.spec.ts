@@ -23,6 +23,8 @@ const TARGETS: Target[] = [
   { name: "service status", role: "priya", path: async () => "/status" },
   { name: "desk queue", role: "manoj", path: async () => "/desk?view=open" },
   { name: "desk ticket", role: "manoj", path: async () => `/desk/tickets/${await ticket()}` },
+  { name: "admin console overview", role: "admin", path: async () => "/admin" },
+  { name: "admin teams", role: "admin", path: async () => "/admin/teams" },
 ];
 
 function collectErrors(page: Page) {

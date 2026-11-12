@@ -1,6 +1,7 @@
 import { requireViewer, type Viewer } from "@/lib/auth";
 import { createClient } from "@/lib/supabase/server";
-import { buildNav } from "@/lib/nav";
+import { buildAdminNav, buildNav } from "@/lib/nav";
+import { getDeskMode } from "@/lib/desk-mode";
 import { DeskShell } from "@/components/shell/desk-shell";
 
 function roleLabel(v: Viewer) {
@@ -36,14 +37,19 @@ export default async function DeskLayout({ children }: LayoutProps<"/">) {
   ]);
 
   const approvals = (myApprovals.count ?? 0) + (leadApprovals.count ?? 0);
-  const sections = buildNav(
-    { isAgent: me.isAgent, isLead: me.isLead, isAdmin: me.isAdmin, managesAssets: me.managesAssets, showApprovals: me.isLead || (reports.count ?? 0) > 0 },
-    { approvals, unassigned: unassigned.count ?? 0, activeIncidents: incidents.count ?? 0, myTeamIncidents: teamIncidents.count ?? 0 },
-  );
+  const mode = await getDeskMode(me);
+  const sections =
+    mode === "admin"
+      ? buildAdminNav({ approvals, unassigned: unassigned.count ?? 0, activeIncidents: incidents.count ?? 0 })
+      : buildNav(
+          { isAgent: me.isAgent, isLead: me.isLead, isAdmin: me.isAdmin, managesAssets: me.managesAssets, showApprovals: me.isLead || (reports.count ?? 0) > 0 },
+          { approvals, unassigned: unassigned.count ?? 0, activeIncidents: incidents.count ?? 0, myTeamIncidents: teamIncidents.count ?? 0 },
+        );
 
   return (
     <DeskShell
       sections={sections}
+      mode={me.isAdmin ? mode : null}
       user={{ name: me.name, email: me.email, avatarUrl: me.avatarUrl, designation: me.designation, roleLabel: roleLabel(me) }}
       notifications={notes.data ?? []}
       unread={unread.count ?? 0}

@@ -13,8 +13,14 @@ for (const role of ROLES) {
     await page.getByLabel("Work email").fill(USERS[role].email);
     await page.getByLabel("Password", { exact: true }).fill(PASSWORD);
     await page.getByRole("button", { name: "Sign in" }).click();
-    await page.waitForURL(/\/home(\?|$)/);
-    await expect(page.getByRole("heading", { level: 1, name: "How can we help today?" })).toBeVisible();
+    if (role === "admin") {
+      // Desk admins start in the admin console.
+      await page.waitForURL(/\/admin$/);
+      await expect(page.getByRole("heading", { level: 1, name: "Admin console" })).toBeVisible();
+    } else {
+      await page.waitForURL(/\/home(\?|$)/);
+      await expect(page.getByRole("heading", { level: 1, name: "How can we help today?" })).toBeVisible();
+    }
     await page.context().storageState({ path: stateFile(role) });
   });
 }

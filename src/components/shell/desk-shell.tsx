@@ -20,6 +20,7 @@ import {
   MessageSquareText,
   Siren,
   Laptop,
+  LayoutDashboard,
   Menu,
   PlusCircle,
   ShoppingBag,
@@ -30,6 +31,8 @@ import {
   type LucideIcon,
 } from "lucide-react";
 import type { NavIcon, NavSection } from "@/lib/nav";
+import type { DeskMode } from "@/lib/desk-mode";
+import { openAdminConsole } from "@/app/(desk)/_actions";
 import { cn } from "@/lib/utils";
 import { NotificationsMenu, type NotificationItem } from "./notifications-menu";
 import { UserMenu, type ShellUser } from "./user-menu";
@@ -56,6 +59,7 @@ const ICONS: Record<NavIcon, LucideIcon> = {
   status: Activity,
   incidents: Siren,
   templates: MessageSquareText,
+  overview: LayoutDashboard,
 };
 
 function isActive(pathname: string, href: string, exact?: boolean) {
@@ -103,8 +107,24 @@ function NavList({ sections, pathname, onNavigate }: { sections: NavSection[]; p
   );
 }
 
+/** Shown to desk admins while they use the help center ("my requests" mode). */
+function BackToConsole() {
+  return (
+    <form action={openAdminConsole} className="mb-5">
+      <button
+        type="submit"
+        className="flex w-full items-center gap-2 rounded-lg border border-white/20 bg-white/5 px-3 py-2 text-left text-sm font-medium text-white hover:bg-white/10"
+      >
+        <LayoutDashboard className="h-4 w-4 shrink-0" aria-hidden />
+        <span className="flex-1">Back to admin console</span>
+      </button>
+    </form>
+  );
+}
+
 export function DeskShell({
   sections,
+  mode,
   user,
   notifications,
   unread,
@@ -115,6 +135,8 @@ export function DeskShell({
   children,
 }: {
   sections: NavSection[];
+  /** Desk admins only: which side of the desk they're on. null for everyone else. */
+  mode: DeskMode | null;
   user: ShellUser;
   notifications: NotificationItem[];
   unread: number;
@@ -138,24 +160,31 @@ export function DeskShell({
         <button type="button" onClick={() => setOpen(true)} className="rounded-md p-2 text-slate-600 hover:bg-slate-100 lg:hidden" aria-label="Open menu">
           <Menu className="h-5 w-5" />
         </button>
-        <Link href="/home" className="flex shrink-0 items-center gap-2.5 lg:w-[252px] lg:pl-3">
+        <Link href={mode === "admin" ? "/admin" : "/home"} className="flex shrink-0 items-center gap-2.5 lg:w-[252px] lg:pl-3">
           <Image src="/grevya-logo.png" alt="Grevya" width={120} height={60} className="h-10 w-auto" priority />
           <span className="hidden border-l border-slate-200 pl-2.5 text-[13px] font-semibold leading-tight text-slate-600 sm:block">
             Service
             <br />
             Desk
           </span>
+          {mode === "admin" && (
+            <span className="hidden whitespace-nowrap rounded-full bg-navy-900 px-2 py-0.5 text-[11px] font-semibold text-white md:inline-block">Admin console</span>
+          )}
         </Link>
         <div className="flex min-w-0 flex-1 justify-center px-1">
           <HeaderSearch isAgent={isAgent} />
         </div>
         <div className="flex shrink-0 items-center gap-1">
           <NotificationsMenu items={notifications} unread={unread} />
-          <UserMenu user={user} peopleSuccessUrl={peopleSuccessUrl} isAgent={isAgent} away={away} emailEnabled={emailEnabled} />
+          <UserMenu user={user} mode={mode} peopleSuccessUrl={peopleSuccessUrl} isAgent={isAgent} away={away} emailEnabled={emailEnabled} />
         </div>
       </header>
 
-      <aside className="no-print fixed bottom-0 left-0 top-16 z-30 hidden w-[264px] overflow-y-auto bg-navy-900 px-3 py-5 thin-scroll lg:block">
+      <aside
+        aria-label={mode === "admin" ? "Admin console" : "Service Desk"}
+        className="no-print fixed bottom-0 left-0 top-16 z-30 hidden w-[264px] overflow-y-auto bg-navy-900 px-3 py-5 thin-scroll lg:block"
+      >
+        {mode === "self" && <BackToConsole />}
         <NavList sections={sections} pathname={pathname} />
       </aside>
 
@@ -164,11 +193,12 @@ export function DeskShell({
           <button type="button" className="absolute inset-0 bg-slate-900/40" aria-label="Close menu" onClick={() => setOpen(false)} />
           <div className="animate-in absolute inset-y-0 left-0 w-[280px] max-w-[85vw] overflow-y-auto bg-navy-900 px-3 py-4">
             <div className="mb-4 flex items-center justify-between px-2">
-              <span className="text-sm font-semibold text-white">Service Desk</span>
+              <span className="text-sm font-semibold text-white">{mode === "admin" ? "Admin console" : "Service Desk"}</span>
               <button type="button" onClick={() => setOpen(false)} className="rounded-md p-1.5 text-white/70 hover:bg-white/10" aria-label="Close menu">
                 <X className="h-5 w-5" />
               </button>
             </div>
+            {mode === "self" && <BackToConsole />}
             <NavList sections={sections} pathname={pathname} onNavigate={() => setOpen(false)} />
           </div>
         </div>

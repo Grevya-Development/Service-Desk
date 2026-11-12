@@ -12,6 +12,10 @@ const eslintConfig = defineConfig([
     "out/**",
     "build/**",
     "next-env.d.ts",
+    // Local scratch scripts (gitignored).
+    ".tmp/**",
+    "playwright-report/**",
+    "test-results/**",
   ]),
 ]);
 

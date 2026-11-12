@@ -2,20 +2,24 @@
 
 import { useEffect, useRef, useState, useTransition } from "react";
 import { toast } from "sonner";
-import { ExternalLink, LogOut, Mail, MailX, Moon, Sun } from "lucide-react";
+import { ClipboardList, ExternalLink, LayoutDashboard, LogOut, Mail, MailX, Moon, Sun } from "lucide-react";
 import { Avatar } from "@/components/ui/avatar";
-import { setAway, setEmailNotifications, signOut } from "@/app/(desk)/_actions";
+import { openAdminConsole, openMyRequests, setAway, setEmailNotifications, signOut } from "@/app/(desk)/_actions";
+import type { DeskMode } from "@/lib/desk-mode";
 
 export type ShellUser = { name: string; email: string; avatarUrl: string | null; designation: string | null; roleLabel: string };
 
 export function UserMenu({
   user,
+  mode,
   peopleSuccessUrl,
   isAgent,
   away,
   emailEnabled,
 }: {
   user: ShellUser;
+  /** Desk admins only; null for everyone else. */
+  mode: DeskMode | null;
   peopleSuccessUrl: string;
   isAgent: boolean;
   away: boolean;
@@ -46,6 +50,14 @@ export function UserMenu({
             <p className="truncate text-xs text-slate-500">{user.email}</p>
             <p className="mt-1 text-[11px] font-medium text-primary-600">{user.roleLabel}</p>
           </div>
+          {mode && (
+            <form action={mode === "admin" ? openMyRequests : openAdminConsole} className="border-b border-slate-100">
+              <button type="submit" className="flex w-full items-center gap-2 px-4 py-2.5 text-left text-sm font-medium text-slate-700 hover:bg-slate-50">
+                {mode === "admin" ? <ClipboardList className="h-4 w-4 text-primary-600" /> : <LayoutDashboard className="h-4 w-4 text-primary-600" />}
+                <span className="flex-1">{mode === "admin" ? "Switch to my requests" : "Back to admin console"}</span>
+              </button>
+            </form>
+          )}
           {isAgent && (
             <button
               type="button"

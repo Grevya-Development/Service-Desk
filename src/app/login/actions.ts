@@ -1,11 +1,12 @@
 "use server";
 
-import { headers } from "next/headers";
+import { cookies, headers } from "next/headers";
 import { createClient } from "@/lib/supabase/server";
 import { createAdminClient } from "@/lib/supabase/admin";
 import { ok, fail, type ActionState } from "@/lib/actions";
 import { str } from "@/lib/utils";
 import { safeNext } from "@/lib/safe-next";
+import { DESK_MODE_COOKIE } from "@/lib/desk-mode";
 
 /** Passwords are used exactly as typed, same as People Success (the two apps share accounts). */
 function rawPassword(fd: FormData, key: string) {
@@ -26,9 +27,16 @@ export async function signIn(_prev: ActionState, fd: FormData): Promise<ActionSt
   const next = str(fd, "next");
   if (!email || !password) return fail("Enter your email and password");
   const supabase = await createClient();
-  const { error } = await supabase.auth.signInWithPassword({ email, password });
+  const { data, error } = await supabase.auth.signInWithPassword({ email, password });
   if (error) return fail(signInError(error.code, error.message));
-  return ok("Welcome back!", safeNext(next));
+  return ok("Welcome back!", safeNext(next, await landingPage(supabase, data.user.id)));
+}
+
+/** Desk admins start in the admin console (unless they last chose "my requests"); everyone else at home. */
+async function landingPage(supabase: Awaited<ReturnType<typeof createClient>>, userId: string) {
+  if ((await cookies()).get(DESK_MODE_COOKIE)?.value === "self") return "/home";
+  const { data } = await supabase.schema("public").from("employees").select("role").eq("user_id", userId).neq("status", "exited").maybeSingle();
+  return data?.role === "super_admin" ? "/admin" : "/home";
 }
 
 export async function requestPasswordReset(_prev: ActionState, fd: FormData): Promise<ActionState> {

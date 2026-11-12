@@ -15,7 +15,9 @@ import {
   UserCheck,
   Wrench,
 } from "lucide-react";
+import { redirect } from "next/navigation";
 import { requireViewer } from "@/lib/auth";
+import { getDeskMode } from "@/lib/desk-mode";
 import { createClient } from "@/lib/supabase/server";
 import { Card, CardHeader, EmptyState, buttonClass } from "@/components/ui";
 import { ApprovalBadge, TicketStatusBadge } from "@/components/tickets/badges";
@@ -39,6 +41,8 @@ type OpenTicket = {
 
 export default async function HomePage({ searchParams }: { searchParams: Promise<Record<string, string | string[] | undefined>> }) {
   const me = await requireViewer();
+  // Desk admins open the admin console unless they switched to their own requests.
+  if ((await getDeskMode(me)) === "admin") redirect("/admin");
   const sp = await searchParams;
   const denied = param(sp.denied) === "1";
   const supabase = await createClient();
